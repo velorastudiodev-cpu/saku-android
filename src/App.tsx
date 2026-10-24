@@ -1529,19 +1529,27 @@ export function App() {
                     Ekspor semua transaksi CSV
                   </button>
                   <p className="hint">
-                    Cadangan berisi catatan keuanganmu. Simpan di tempat
-                    pribadi.
+                    File JSON dan CSV hasil ekspor tidak dienkripsi. Simpan di
+                    tempat pribadi dan bagikan hanya kepada pihak yang kamu
+                    pilih.
                   </p>
                 </Section>
                 <Section title="Tentang Saku">
                   <div className="about-brand">
                     <Mark />
                     <span>saku.</span>
-                    <small>v1.2.0</small>
+                    <small>v1.2.5</small>
                   </div>
                   <p className="muted">
-                    Ruang kecil untuk kebiasaan finansial yang lebih baik.
-                    Dibuat untuk pemakaian pribadi, tanpa akun dan tanpa iklan.
+                    Catat pengeluaran, pahami kebiasaan, dan sisihkan uang untuk
+                    hal yang berarti. Oleh Velora Studio Dev, tanpa akun dan
+                    tanpa iklan.
+                  </p>
+                  <p className="hint">
+                    Di Android, catatan dienkripsi di perangkat dan aplikasi
+                    tidak memiliki izin internet. Gunakan kunci layar untuk
+                    membatasi akses. Data terhapus jika aplikasi di-uninstall;
+                    simpan cadangan secara berkala.
                   </p>
                   <div className="key-value">
                     <span>Transaksi tersimpan</span>
@@ -1556,7 +1564,9 @@ export function App() {
             </div>
           )}
           <footer className="app-footer">
-            <span>Saku · Ruang untuk rencana baik.</span>
+            <span>
+              Copyright © {new Date().getFullYear()} by Velora Studio Dev.
+            </span>
             <span>Rupiah Indonesia</span>
           </footer>
         </div>

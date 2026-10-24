@@ -3,6 +3,11 @@ const config: CapacitorConfig = {
   appId: "com.velorastudio.saku",
   appName: "Saku",
   webDir: "dist",
-  android: { backgroundColor: "#f2f4f7", allowMixedContent: false },
+  loggingBehavior: "none",
+  android: {
+    backgroundColor: "#f2f4f7",
+    allowMixedContent: false,
+    webContentsDebuggingEnabled: false,
+  },
 };
 export default config;

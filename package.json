@@ -1,7 +1,7 @@
 {
   "name": "saku-personal-finance",
-  "version": "1.2.0",
-  "description": "Catatan keuangan pribadi Android, offline dan berbahasa Indonesia",
+  "version": "1.2.5",
+  "description": "Saku oleh Velora Studio Dev: catatan keuangan Android offline untuk pengeluaran, anggaran, dan tujuan tabungan.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -11,7 +11,7 @@
     "android:sync": "npm run build && cap sync android"
   },
   "keywords": [],
-  "author": "",
+  "author": "Velora Studio Dev",
   "license": "UNLICENSED",
   "type": "module",
   "dependencies": {
