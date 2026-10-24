@@ -1,6 +1,6 @@
 {
   "name": "saku-personal-finance",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Catatan keuangan pribadi Android, offline dan berbahasa Indonesia",
   "scripts": {
     "dev": "vite",

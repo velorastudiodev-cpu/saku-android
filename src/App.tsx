@@ -2,8 +2,11 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type FormEvent,
+  type MouseEvent,
   type ReactNode,
+  type TouchEvent,
 } from "react";
 import { App as NativeApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
@@ -55,6 +58,7 @@ import {
 } from "./domain";
 import { exportFile, loadWallet, saveWallet } from "./storage";
 import { CashChart } from "./Chart";
+import { MoneyAdvice } from "./MoneyAdvice";
 
 type Page = "home" | "transactions" | "reports" | "goals" | "settings";
 type Modal =
@@ -211,6 +215,15 @@ export function App() {
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [page, setPage] = useState<Page>(readPage);
+  const pageContent = useRef<HTMLDivElement>(null);
+  const previousPage = useRef(page);
+  const swipe = useRef<{
+    x: number;
+    y: number;
+    page: Page;
+    axis: "horizontal" | "vertical" | null;
+  } | null>(null);
+  const suppressClickUntil = useRef(0);
   const [modal, setModal] = useState<Modal | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -272,10 +285,95 @@ export function App() {
     const id = setTimeout(() => setNotice(""), 4000);
     return () => clearTimeout(id);
   }, [notice]);
+  useEffect(() => {
+    const from = pages.findIndex((p) => p.id === previousPage.current);
+    const to = pages.findIndex((p) => p.id === page);
+    previousPage.current = page;
+    swipe.current = null;
+    if (from === to || matchMedia("(prefers-reduced-motion: reduce)").matches)
+      return;
+    const animation = pageContent.current?.animate(
+      [
+        { opacity: 0.6, transform: `translateX(${to > from ? 16 : -16}px)` },
+        { opacity: 1, transform: "translateX(0)" },
+      ],
+      { duration: 220, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)" },
+    );
+    return () => animation?.cancel();
+  }, [page]);
   function navigate(p: Page) {
     location.hash = p;
     setPage(p);
   }
+  function startSwipe(e: TouchEvent<HTMLElement>) {
+    swipe.current = null;
+    if (
+      modal ||
+      busy ||
+      e.touches.length !== 1 ||
+      !matchMedia("(max-width: 800px)").matches ||
+      window.getSelection()?.toString()
+    )
+      return;
+    const target = e.target as Element;
+    if (
+      e.currentTarget.tagName !== "NAV" &&
+      target.closest(
+        "form, input, select, textarea, label, summary, .table-scroll, [contenteditable]",
+      )
+    )
+      return;
+    const { clientX: x, clientY: y } = e.touches[0];
+    // Leave the screen edges to Android's system back gesture.
+    if (x < 24 || x > window.innerWidth - 24) return;
+    swipe.current = { x, y, page, axis: null };
+  }
+  function moveSwipe(e: TouchEvent<HTMLElement>) {
+    const gesture = swipe.current;
+    if (!gesture) return;
+    if (e.touches.length !== 1) {
+      swipe.current = null;
+      return;
+    }
+    const dx = Math.abs(e.touches[0].clientX - gesture.x);
+    const dy = Math.abs(e.touches[0].clientY - gesture.y);
+    if (!gesture.axis && Math.max(dx, dy) >= 12)
+      gesture.axis = dx > dy * 1.5 ? "horizontal" : "vertical";
+  }
+  function endSwipe(e: TouchEvent<HTMLElement>) {
+    const gesture = swipe.current;
+    swipe.current = null;
+    if (
+      !gesture ||
+      gesture.axis !== "horizontal" ||
+      e.touches.length ||
+      modal ||
+      busy ||
+      gesture.page !== page
+    )
+      return;
+    suppressClickUntil.current = Date.now() + 400;
+    const dx = e.changedTouches[0].clientX - gesture.x;
+    const dy = e.changedTouches[0].clientY - gesture.y;
+    if (Math.abs(dx) < 64 || Math.abs(dx) <= Math.abs(dy) * 1.5) return;
+    const next =
+      pages[pages.findIndex((p) => p.id === page) + (dx < 0 ? 1 : -1)];
+    if (next) navigate(next.id);
+  }
+  const swipeHandlers = {
+    onTouchStart: startSwipe,
+    onTouchMove: moveSwipe,
+    onTouchEnd: endSwipe,
+    onTouchCancel: () => {
+      swipe.current = null;
+    },
+    onClickCapture: (e: MouseEvent<HTMLElement>) => {
+      if (Date.now() < suppressClickUntil.current) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    },
+  };
   function open(m: Modal) {
     setError("");
     setModal(m);
@@ -605,7 +703,16 @@ export function App() {
           </span>
         </a>
         <p className="workspace-label">Ruang pribadi {wallet.name}</p>
-        <nav aria-label="Navigasi utama">
+        <nav
+          aria-label="Navigasi utama"
+          style={
+            {
+              "--nav-index": pages.findIndex((p) => p.id === page),
+            } as CSSProperties
+          }
+          {...swipeHandlers}
+        >
+          <span className="nav-indicator" aria-hidden="true" />
           {pages.map(({ id, label, Icon }) => (
             <a
               key={id}
@@ -624,7 +731,7 @@ export function App() {
           </div>
         </div>
       </aside>
-      <main className="canvas">
+      <main className="canvas" {...swipeHandlers}>
         <div className="mobile-brand">
           <a className="brand" href="#home">
             <Mark />
@@ -638,807 +745,821 @@ export function App() {
             {wallet.name.slice(0, 1).toLocaleUpperCase("id")}
           </button>
         </div>
-        <header className="page-header">
-          <div>
-            <h1>{pages.find((p) => p.id === page)?.label}</h1>
-            <p>
-              {page === "home"
-                ? dateLabel(today())
-                : page === "transactions"
-                  ? "Setiap rupiah punya cerita."
-                  : page === "reports"
-                    ? "Kenali ritme uangmu."
-                    : page === "goals"
-                      ? "Sedikit demi sedikit, sampai tujuan."
-                      : "Atur kebiasaan. Jaga catatan."}
-            </p>
-          </div>
-          {page === "home" || page === "transactions" ? (
-            addTransaction
-          ) : page === "goals" ? (
-            <button className="primary" onClick={() => open({ kind: "goal" })}>
-              <Plus size={18} />
-              Tujuan baru
-            </button>
-          ) : null}
-        </header>
         {status}
-        {balance.available < 0 && page !== "settings" && (
-          <div className="notice" role="status">
-            {balance.balance < 0
-              ? "Saldo sedang minus."
-              : "Alokasi tujuan melebihi saldo."}{" "}
-            Selisih {money(-balance.available)}. Periksa transaksi atau kurangi
-            alokasi tujuan.
-          </div>
-        )}
-        {page === "home" && (
-          <>
-            <section className="balance-panel panel">
-              <div className="balance-main">
-                <p className="muted">Saldo tersedia</p>
-                <div
-                  className="balance-value num"
-                  data-testid="available-balance"
-                >
-                  {money(balance.available)}
-                </div>
-                <p className="balance-caption">
-                  Uang yang bisa dipakai, setelah alokasi tujuan.
-                </p>
-                <div
-                  className="pocket-bar"
-                  role="img"
-                  aria-label={`Saldo ${money(balance.balance)}, untuk tujuan ${money(balance.reserved)}`}
-                >
-                  <span style={{ width: `${100 - reserveShare}%` }} />
-                  <span style={{ width: `${reserveShare}%` }} />
-                </div>
-                <div className="balance-parts">
-                  <span>
-                    Saldo total
-                    <strong className="num">{money(balance.balance)}</strong>
-                  </span>
-                  <span>
-                    Untuk tujuan
-                    <strong className="num">{money(balance.reserved)}</strong>
-                  </span>
-                </div>
-              </div>
-              <div className="daily-pocket">
-                <span className="muted">Ruang jajan hari ini</span>
-                <strong className="num">{money(safeDaily)}</strong>
-                <p>
-                  {wallet.budget
-                    ? "Sisa anggaran dan saldo tersedia"
-                    : "Saldo tersedia"}{" "}
-                  dibagi {daysLeft} hari tersisa bulan ini.
-                </p>
-                <div className="today-spent">
-                  <span>Sudah keluar hari ini</span>
-                  <span className="num">{money(day.expense)}</span>
-                </div>
-              </div>
-            </section>
-            <div className="overview-grid">
-              <Section
-                title="Arus kas minggu ini"
-                action={
-                  <button
-                    className="text-button"
-                    onClick={() => {
-                      setPeriod("week");
-                      setOffset(0);
-                      navigate("reports");
-                    }}
-                  >
-                    Laporan
-                    <ArrowUpRight size={16} />
-                  </button>
-                }
-              >
-                <div className="flow-stats">
-                  <div>
-                    <span>Pemasukan</span>
-                    <strong className="num">
-                      {money(
-                        totals(inRange(wallet.transactions, weekRange)).income,
-                      )}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Pengeluaran</span>
-                    <strong className="num">
-                      {money(
-                        totals(inRange(wallet.transactions, weekRange)).expense,
-                      )}
-                    </strong>
-                  </div>
-                </div>
-                <CashChart
-                  transactions={wallet.transactions}
-                  start={weekRange.start}
-                  end={weekRange.end}
-                />
-              </Section>
-              <Section title="Rencana bulan ini" className="month-plan">
-                <p className="muted">{monthRange.label}</p>
-                <div className="budget-value num">
-                  {money(month.expense)}
-                  <span>
-                    {" "}
-                    / {wallet.budget ? money(wallet.budget) : "belum diatur"}
-                  </span>
-                </div>
-                {wallet.budget > 0 ? (
-                  <>
-                    <progress
-                      className={month.expense > wallet.budget ? "over" : ""}
-                      max={wallet.budget}
-                      value={Math.min(month.expense, wallet.budget)}
-                      aria-label="Anggaran terpakai"
-                    />
-                    <p
-                      className={
-                        month.expense > wallet.budget ? "negative" : "muted"
-                      }
-                    >
-                      {month.expense > wallet.budget
-                        ? `Melewati anggaran ${money(month.expense - wallet.budget)}.`
-                        : `${pct((month.expense / wallet.budget) * 100)} terpakai · tersisa ${money(budgetLeft)}`}
-                    </p>
-                  </>
-                ) : (
-                  <p className="muted">
-                    Tentukan batas pengeluaran untuk menjaga uang jajanmu.
-                  </p>
-                )}
-                <div className="key-value">
-                  <span>Surplus bulan ini</span>
-                  <strong className={`num ${month.net < 0 ? "negative" : ""}`}>
-                    {money(month.net)}
-                  </strong>
-                </div>
-                <div className="key-value">
-                  <span>Persentase surplus</span>
-                  <strong className="num">{pct(month.rate)}</strong>
-                </div>
-                <button
-                  className="text-button"
-                  onClick={() => navigate("settings")}
-                >
-                  Atur anggaran
-                  <ArrowRight size={16} />
-                </button>
-              </Section>
-              <Section
-                title="Transaksi terbaru"
-                action={
-                  <button
-                    className="text-button"
-                    onClick={() => navigate("transactions")}
-                  >
-                    Semua
-                    <ArrowRight size={16} />
-                  </button>
-                }
-              >
-                {ordered.length ? (
-                  rows(ordered.slice(0, 4))
-                ) : (
-                  <Empty
-                    title="Catatan pertamamu dimulai di sini."
-                    action={
-                      <button
-                        className="text-button"
-                        onClick={() => open({ kind: "transaction" })}
-                      >
-                        Tambah transaksi
-                        <Plus size={16} />
-                      </button>
-                    }
-                  >
-                    Masukkan uang jajan yang diterima atau pengeluaran hari ini.
-                  </Empty>
-                )}
-              </Section>
-              <Section
-                title="Sedang kamu wujudkan"
-                action={
-                  <button
-                    className="text-button"
-                    onClick={() => navigate("goals")}
-                  >
-                    Tujuan
-                    <ArrowRight size={16} />
-                  </button>
-                }
-              >
-                {wallet.goals.length ? (
-                  <>
-                    {wallet.goals.slice(0, 2).map(goalPreview)}
-                    <p className="hint">
-                      Tabungan tetap milikmu, hanya disisihkan dari saldo
-                      tersedia.
-                    </p>
-                  </>
-                ) : (
-                  <Empty
-                    title="Beri uangmu sebuah tujuan."
-                    action={
-                      <button
-                        className="text-button"
-                        onClick={() => open({ kind: "goal" })}
-                      >
-                        Buat tujuan
-                        <Plus size={16} />
-                      </button>
-                    }
-                  >
-                    Dana darurat, barang impian, atau perjalanan berikutnya.
-                  </Empty>
-                )}
-              </Section>
+        <div ref={pageContent}>
+          <header className="page-header">
+            <div>
+              <h1>{pages.find((p) => p.id === page)?.label}</h1>
+              <p>
+                {page === "home"
+                  ? dateLabel(today())
+                  : page === "transactions"
+                    ? "Setiap rupiah punya cerita."
+                    : page === "reports"
+                      ? "Kenali ritme uangmu."
+                      : page === "goals"
+                        ? "Sedikit demi sedikit, sampai tujuan."
+                        : "Atur kebiasaan. Jaga catatan."}
+              </p>
             </div>
-          </>
-        )}
-        {page === "transactions" && (
-          <Section
-            title="Riwayat uangmu"
-            action={<span className="muted">{filtered.length} transaksi</span>}
-          >
-            <div className="filters">
-              <label className="search-field">
-                <Search size={18} />
-                <input
-                  aria-label="Cari transaksi"
-                  value={query}
-                  onChange={(e) => {
-                    setQuery(e.target.value);
-                    setLimit(40);
-                  }}
-                  placeholder="Cari catatan atau kategori"
-                />
-              </label>
-              <label className="sr-only" htmlFor="tx-month">
-                Bulan transaksi
-              </label>
-              <select
-                id="tx-month"
-                value={txMonth}
-                onChange={(e) => {
-                  setTxMonth(e.target.value);
-                  setLimit(40);
-                }}
-              >
-                <option value="">Semua bulan</option>
-                {[
-                  ...new Set(
-                    wallet.transactions.map((t) => t.date.slice(0, 7)),
-                  ),
-                ]
-                  .sort()
-                  .reverse()
-                  .map((m) => (
-                    <option key={m} value={m}>
-                      {periodRange("month", 0, `${m}-01`).label}
-                    </option>
-                  ))}
-              </select>
-            </div>
-            <div className="filter-row">
-              <div className="tabs" role="group" aria-label="Jenis transaksi">
-                {(["all", "expense", "income"] as const).map((f) => (
-                  <button
-                    key={f}
-                    aria-pressed={filter === f}
-                    onClick={() => {
-                      setFilter(f);
-                      setLimit(40);
-                    }}
-                  >
-                    {f === "all"
-                      ? "Semua"
-                      : f === "expense"
-                        ? "Pengeluaran"
-                        : "Pemasukan"}
-                  </button>
-                ))}
-              </div>
-              {(query || txMonth) && (
-                <button
-                  className="text-button"
-                  onClick={() => {
-                    setQuery("");
-                    setTxMonth("");
-                  }}
-                >
-                  Reset
-                </button>
-              )}
-            </div>
-            <div className="transaction-summary">
-              <span>
-                Masuk{" "}
-                <strong className="num">
-                  {money(totals(filtered).income)}
-                </strong>
-              </span>
-              <span>
-                Keluar{" "}
-                <strong className="num">
-                  {money(totals(filtered).expense)}
-                </strong>
-              </span>
-            </div>
-            {filtered.length ? (
-              rows(filtered.slice(0, limit))
-            ) : (
-              <Empty
-                title={
-                  wallet.transactions.length
-                    ? "Tidak ada transaksi yang cocok."
-                    : "Belum ada transaksi."
-                }
-              >
-                {wallet.transactions.length
-                  ? "Coba kata lain atau ubah filter."
-                  : "Catat pemasukan atau pengeluaran pertamamu."}
-              </Empty>
-            )}
-            {filtered.length > limit && (
-              <button className="wide" onClick={() => setLimit(limit + 40)}>
-                Tampilkan lagi ({limit} dari {filtered.length})
-              </button>
-            )}
-            <div className="list-footer">
-              <span>Ketuk transaksi untuk mengedit atau menghapus.</span>
+            {page === "home" || page === "transactions" ? (
+              addTransaction
+            ) : page === "goals" ? (
               <button
-                className="text-button"
-                disabled={!filtered.length || busy}
-                onClick={() =>
-                  void run(() =>
-                    exportFile(
-                      `saku-transaksi-${today()}.csv`,
-                      csv(filtered),
-                      "text/csv",
-                    ),
-                  )
-                }
+                className="primary"
+                onClick={() => open({ kind: "goal" })}
               >
-                <Download size={16} />
-                CSV
+                <Plus size={18} />
+                Tujuan baru
               </button>
+            ) : null}
+          </header>
+          {balance.available < 0 && page !== "settings" && (
+            <div className="notice" role="status">
+              {balance.balance < 0
+                ? "Saldo sedang minus."
+                : "Alokasi tujuan melebihi saldo."}{" "}
+              Selisih {money(-balance.available)}. Periksa transaksi atau
+              kurangi alokasi tujuan.
             </div>
-          </Section>
-        )}
-        {page === "reports" && (
-          <>
-            <div className="report-controls">
-              <div className="tabs" role="group" aria-label="Periode laporan">
-                {(["week", "month"] as const).map((p) => (
-                  <button
-                    key={p}
-                    aria-pressed={period === p}
-                    onClick={() => {
-                      setPeriod(p);
-                      setOffset(0);
-                    }}
+          )}
+          {page === "home" && (
+            <>
+              <section className="balance-panel panel">
+                <div className="balance-main">
+                  <p className="muted">Saldo tersedia</p>
+                  <div
+                    className="balance-value num"
+                    data-testid="available-balance"
                   >
-                    {p === "week" ? "Mingguan" : "Bulanan"}
-                  </button>
-                ))}
-              </div>
-              <div className="period-nav">
-                <button
-                  className="icon-button"
-                  aria-label="Periode sebelumnya"
-                  onClick={() => setOffset(offset - 1)}
-                >
-                  <ChevronLeft size={18} />
-                </button>
-                <span>{range.label}</span>
-                <button
-                  className="icon-button"
-                  disabled={offset === 0}
-                  aria-label="Periode berikutnya"
-                  onClick={() => setOffset(offset + 1)}
-                >
-                  <ChevronRight size={18} />
-                </button>
-              </div>
-            </div>
-            <section className="report-totals panel">
-              <div>
-                <span>Surplus bersih</span>
-                <strong
-                  className={`num lead ${report.net < 0 ? "negative" : ""}`}
-                  data-testid="report-net"
-                >
-                  {money(report.net)}
-                </strong>
-                <small>
-                  {report.rate === null
-                    ? "Persentase belum tersedia tanpa pemasukan."
-                    : `${pct(report.rate)} dari pemasukan periode ini`}
-                </small>
-              </div>
-              <div>
-                <span>Pemasukan</span>
-                <strong className="num">{money(report.income)}</strong>
-                <small>
-                  {report.income + report.expense
-                    ? pct(
-                        (report.income / (report.income + report.expense)) *
-                          100,
-                      )
-                    : "0%"}{" "}
-                  dari total arus uang
-                </small>
-              </div>
-              <div>
-                <span>Pengeluaran</span>
-                <strong className="num">{money(report.expense)}</strong>
-                <small>
-                  {report.income + report.expense
-                    ? pct(
-                        (report.expense / (report.income + report.expense)) *
-                          100,
-                      )
-                    : "0%"}{" "}
-                  dari total arus uang
-                </small>
-              </div>
-            </section>
-            <div className="overview-grid">
-              <Section
-                title="Pemasukan & pengeluaran"
-                action={
-                  <span className="muted">{scoped.length} transaksi</span>
-                }
-              >
-                <CashChart
-                  transactions={scoped}
-                  start={range.start}
-                  end={range.end}
-                />
-                <p className="chart-note">
-                  {report.income
-                    ? `${pct(report.expenseRate)} dari pemasukan terpakai untuk pengeluaran.`
-                    : "Tambahkan pemasukan untuk menghitung persentase surplus."}
-                </p>
-              </Section>
-              <Section title="Dibanding periode lalu">
-                <p className="comparison-period">
-                  {periodRange(period, offset - 1).label}
-                </p>
-                <p className="hint">
-                  Periode sebelumnya dihitung penuh. Periode berjalan bisa belum
-                  selesai.
-                </p>
-                {(["income", "expense", "net"] as const).map((k) => {
-                  const delta = report[k] - previous[k];
-                  return (
-                    <div className="comparison" key={k}>
-                      <span>
-                        {k === "income"
-                          ? "Pemasukan"
-                          : k === "expense"
-                            ? "Pengeluaran"
-                            : "Surplus"}
-                      </span>
-                      <strong
-                        className={`num ${delta === 0 ? "" : (k === "expense" ? delta > 0 : delta < 0) ? "negative" : "positive"}`}
-                      >
-                        {delta > 0 ? "+" : ""}
-                        {money(delta)}
-                      </strong>
-                      <small>
-                        {previous[k] > 0
-                          ? `${delta > 0 ? "+" : ""}${pct((delta / previous[k]) * 100)}`
-                          : "—"}{" "}
-                        · sebelumnya {money(previous[k])}
-                      </small>
-                    </div>
-                  );
-                })}
-              </Section>
-              <Section
-                title="Ke mana uangmu pergi?"
-                className="category-panel"
-                action={
-                  <select
-                    aria-label="Jenis rincian kategori"
-                    value={categoryKind}
-                    onChange={(e) => setCategoryKind(e.target.value as Kind)}
+                    {money(balance.available)}
+                  </div>
+                  <p className="balance-caption">
+                    Uang yang bisa dipakai, setelah alokasi tujuan.
+                  </p>
+                  <div
+                    className="pocket-bar"
+                    role="img"
+                    aria-label={`Saldo ${money(balance.balance)}, untuk tujuan ${money(balance.reserved)}`}
                   >
-                    <option value="expense">Pengeluaran</option>
-                    <option value="income">Pemasukan</option>
-                  </select>
-                }
-              >
-                {breakdown(scoped, categoryKind).length ? (
-                  breakdown(scoped, categoryKind).map((c, i) => (
-                    <div className="category-row" key={c.name}>
-                      <div>
-                        <span>{c.name}</span>
-                        <span className="num">
-                          {money(c.amount)} <small>{pct(c.share)}</small>
-                        </span>
-                      </div>
-                      <div className="category-track">
-                        <span
-                          style={{
-                            width: `${c.share}%`,
-                            background:
-                              i === 0 ? "var(--chart)" : "var(--chart-muted)",
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <Empty title="Belum ada rincian kategori.">
-                    Catatan pada periode ini akan muncul di sini.
-                  </Empty>
-                )}
-              </Section>
-              <Section title="Cara membaca laporan">
-                <div className="explanation">
-                  <p>
-                    <strong>Surplus = pemasukan − pengeluaran.</strong> Nilai
-                    positif berarti ada uang yang tersisa; nilai negatif berarti
-                    defisit.
-                  </p>
-                  <p>
-                    Persentase surplus dihitung dari pemasukan. Jika pemasukan
-                    nol, persentasenya ditampilkan sebagai tanda “—”.
-                  </p>
-                  <p>
-                    Porsi arus uang membandingkan setiap jenis dengan total
-                    pemasukan + pengeluaran, sehingga kedua porsinya selalu
-                    berjumlah 100% saat ada transaksi.
-                  </p>
-                  <p>
-                    Saldo awal dan alokasi tujuan tidak dihitung sebagai
-                    pemasukan atau pengeluaran.
-                  </p>
+                    <span style={{ width: `${100 - reserveShare}%` }} />
+                    <span style={{ width: `${reserveShare}%` }} />
+                  </div>
+                  <div className="balance-parts">
+                    <span>
+                      Saldo total
+                      <strong className="num">{money(balance.balance)}</strong>
+                    </span>
+                    <span>
+                      Untuk tujuan
+                      <strong className="num">{money(balance.reserved)}</strong>
+                    </span>
+                  </div>
                 </div>
-              </Section>
-            </div>
-          </>
-        )}
-        {page === "goals" && (
-          <>
-            <div className="goals-summary panel">
-              <span>
-                Sudah disisihkan
-                <strong className="num">{money(balance.reserved)}</strong>
-              </span>
-              <span>
-                Masih tersedia
-                <strong className="num">{money(balance.available)}</strong>
-              </span>
-            </div>
-            {wallet.goals.length ? (
-              <div className="goals-grid">
-                {wallet.goals.map((g) => {
-                  const p = goalPlan(g);
-                  return (
-                    <Section
-                      title={g.name}
-                      key={g.id}
-                      action={
-                        <button
-                          className="icon-button"
-                          aria-label={`Edit tujuan ${g.name}`}
-                          onClick={() => open({ kind: "goal", goal: g })}
-                        >
-                          <Pencil size={17} />
-                        </button>
-                      }
-                    >
-                      <div className="goal-amount num">
-                        {money(g.saved)}
-                        <span>dari {money(g.target)}</span>
-                      </div>
-                      <progress
-                        value={g.saved}
-                        max={g.target}
-                        aria-label={`Progres ${g.name}`}
-                      />
-                      <div className="key-value">
-                        <span>{pct(p.progress)} terkumpul</span>
-                        <span>{dateLabel(g.deadline, true)}</span>
-                      </div>
-                      <div className="goal-pace">
-                        {p.remaining === 0 ? (
-                          <>
-                            <Check size={19} />
-                            <p>Target tercapai. Kamu berhasil!</p>
-                          </>
-                        ) : (
-                          <>
-                            <Target size={19} />
-                            <p>
-                              {p.overdue
-                                ? "Target waktumu sudah lewat."
-                                : `Sisihkan ${money(p.daily)} per hari.`}
-                              <small>
-                                {p.overdue
-                                  ? `Masih kurang ${money(p.remaining)}. Atur ulang tanggal target.`
-                                  : `${p.days} hari termasuk hari ini · sisa ${money(p.remaining)}`}
-                              </small>
-                            </p>
-                          </>
-                        )}
-                      </div>
-                      <button
-                        className="wide"
-                        onClick={() => open({ kind: "allocate", goal: g })}
-                      >
-                        {p.remaining === 0
-                          ? "Kelola tabungan"
-                          : "Sisihkan uang"}
-                        <ArrowRight size={17} />
-                      </button>
-                    </Section>
-                  );
-                })}
-              </div>
-            ) : (
-              <Section title="Yang ingin kamu wujudkan">
-                <Empty
-                  title="Keinginan kecil, rencana yang nyata."
+                <div className="daily-pocket">
+                  <span className="muted">Ruang jajan hari ini</span>
+                  <strong className="num">{money(safeDaily)}</strong>
+                  <p>
+                    {wallet.budget
+                      ? "Sisa anggaran dan saldo tersedia"
+                      : "Saldo tersedia"}{" "}
+                    dibagi {daysLeft} hari tersisa bulan ini.
+                  </p>
+                  <div className="today-spent">
+                    <span>Sudah keluar hari ini</span>
+                    <span className="num">{money(day.expense)}</span>
+                  </div>
+                </div>
+              </section>
+              <MoneyAdvice wallet={wallet} />
+              <div className="overview-grid">
+                <Section
+                  title="Arus kas minggu ini"
                   action={
                     <button
-                      className="primary"
-                      onClick={() => open({ kind: "goal" })}
+                      className="text-button"
+                      onClick={() => {
+                        setPeriod("week");
+                        setOffset(0);
+                        navigate("reports");
+                      }}
                     >
-                      <Plus size={18} />
-                      Buat tujuan pertama
+                      Laporan
+                      <ArrowUpRight size={16} />
                     </button>
                   }
                 >
-                  Tentukan nominal dan tanggal. Saku menghitung berapa yang
-                  perlu kamu sisihkan setiap hari.
-                </Empty>
-              </Section>
-            )}
-            <p className="privacy-line">
-              <WalletIcon size={16} />
-              Alokasi tujuan tidak memindahkan uang ke rekening lain. Catat
-              pengeluaran saat uang benar-benar dipakai.
-            </p>
-          </>
-        )}
-        {page === "settings" && (
-          <div className="settings-layout">
-            <Section title="Profil & anggaran">
-              <form
-                key={`${wallet.name}-${wallet.opening}-${wallet.budget}`}
-                onSubmit={onSubmit(async (f) =>
-                  commit(
-                    {
-                      ...wallet,
-                      name: formText(f, "name"),
-                      opening: parseAmount(formText(f, "opening"), true),
-                      budget: parseAmount(formText(f, "budget"), true),
-                    },
-                    "Pengaturan tersimpan.",
-                  ),
-                )}
-              >
-                <label>
-                  Nama panggilan
-                  <input
-                    name="name"
-                    defaultValue={wallet.name}
-                    required
-                    maxLength={40}
+                  <div className="flow-stats">
+                    <div>
+                      <span>Pemasukan</span>
+                      <strong className="num">
+                        {money(
+                          totals(inRange(wallet.transactions, weekRange))
+                            .income,
+                        )}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>Pengeluaran</span>
+                      <strong className="num">
+                        {money(
+                          totals(inRange(wallet.transactions, weekRange))
+                            .expense,
+                        )}
+                      </strong>
+                    </div>
+                  </div>
+                  <CashChart
+                    transactions={wallet.transactions}
+                    start={weekRange.start}
+                    end={weekRange.end}
                   />
-                </label>
-                <AmountField
-                  label="Saldo awal pencatatan"
-                  name="opening"
-                  value={wallet.opening}
-                  zero
-                />
-                <p className="hint">
-                  Mengubah saldo awal mengubah saldo total. Untuk uang baru,
-                  tambahkan transaksi pemasukan.
-                </p>
-                <AmountField
-                  label="Anggaran pengeluaran bulanan"
-                  name="budget"
-                  value={wallet.budget}
-                  zero
-                />
-                <p className="hint">
-                  Batas yang sama dipakai setiap bulan. Isi 0 untuk
-                  menonaktifkan.
-                </p>
-                <button className="primary" disabled={busy}>
-                  Simpan pengaturan
-                </button>
-              </form>
-            </Section>
-            <div className="settings-side">
-              <Section title="Cadangan & data">
-                <p className="muted">
-                  Catatan tersimpan di perangkat ini. Simpan cadangan secara
-                  berkala, terutama sebelum mengganti HP atau menghapus
-                  aplikasi.
-                </p>
-                <button
-                  className="wide"
-                  disabled={busy}
-                  onClick={() =>
-                    void run(() =>
-                      exportFile(
-                        `saku-cadangan-${today()}.json`,
-                        JSON.stringify(wallet, null, 2),
-                      ),
-                    )
+                </Section>
+                <Section title="Rencana bulan ini" className="month-plan">
+                  <p className="muted">{monthRange.label}</p>
+                  <div className="budget-value num">
+                    {money(month.expense)}
+                    <span>
+                      {" "}
+                      / {wallet.budget ? money(wallet.budget) : "belum diatur"}
+                    </span>
+                  </div>
+                  {wallet.budget > 0 ? (
+                    <>
+                      <progress
+                        className={month.expense > wallet.budget ? "over" : ""}
+                        max={wallet.budget}
+                        value={Math.min(month.expense, wallet.budget)}
+                        aria-label="Anggaran terpakai"
+                      />
+                      <p
+                        className={
+                          month.expense > wallet.budget ? "negative" : "muted"
+                        }
+                      >
+                        {month.expense > wallet.budget
+                          ? `Melewati anggaran ${money(month.expense - wallet.budget)}.`
+                          : `${pct((month.expense / wallet.budget) * 100)} terpakai · tersisa ${money(budgetLeft)}`}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="muted">
+                      Tentukan batas pengeluaran untuk menjaga uang jajanmu.
+                    </p>
+                  )}
+                  <div className="key-value">
+                    <span>Surplus bulan ini</span>
+                    <strong
+                      className={`num ${month.net < 0 ? "negative" : ""}`}
+                    >
+                      {money(month.net)}
+                    </strong>
+                  </div>
+                  <div className="key-value">
+                    <span>Persentase surplus</span>
+                    <strong className="num">{pct(month.rate)}</strong>
+                  </div>
+                  <button
+                    className="text-button"
+                    onClick={() => navigate("settings")}
+                  >
+                    Atur anggaran
+                    <ArrowRight size={16} />
+                  </button>
+                </Section>
+                <Section
+                  title="Transaksi terbaru"
+                  action={
+                    <button
+                      className="text-button"
+                      onClick={() => navigate("transactions")}
+                    >
+                      Semua
+                      <ArrowRight size={16} />
+                    </button>
                   }
                 >
-                  <Download size={17} />
-                  Ekspor cadangan JSON
-                </button>
-                <button
-                  className="wide"
-                  disabled={busy}
-                  onClick={() => importRef.current?.click()}
+                  {ordered.length ? (
+                    rows(ordered.slice(0, 4))
+                  ) : (
+                    <Empty
+                      title="Catatan pertamamu dimulai di sini."
+                      action={
+                        <button
+                          className="text-button"
+                          onClick={() => open({ kind: "transaction" })}
+                        >
+                          Tambah transaksi
+                          <Plus size={16} />
+                        </button>
+                      }
+                    >
+                      Masukkan uang jajan yang diterima atau pengeluaran hari
+                      ini.
+                    </Empty>
+                  )}
+                </Section>
+                <Section
+                  title="Sedang kamu wujudkan"
+                  action={
+                    <button
+                      className="text-button"
+                      onClick={() => navigate("goals")}
+                    >
+                      Tujuan
+                      <ArrowRight size={16} />
+                    </button>
+                  }
                 >
-                  <Upload size={17} />
-                  Impor cadangan JSON
+                  {wallet.goals.length ? (
+                    <>
+                      {wallet.goals.slice(0, 2).map(goalPreview)}
+                      <p className="hint">
+                        Tabungan tetap milikmu, hanya disisihkan dari saldo
+                        tersedia.
+                      </p>
+                    </>
+                  ) : (
+                    <Empty
+                      title="Beri uangmu sebuah tujuan."
+                      action={
+                        <button
+                          className="text-button"
+                          onClick={() => open({ kind: "goal" })}
+                        >
+                          Buat tujuan
+                          <Plus size={16} />
+                        </button>
+                      }
+                    >
+                      Dana darurat, barang impian, atau perjalanan berikutnya.
+                    </Empty>
+                  )}
+                </Section>
+              </div>
+            </>
+          )}
+          {page === "transactions" && (
+            <Section
+              title="Riwayat uangmu"
+              action={
+                <span className="muted">{filtered.length} transaksi</span>
+              }
+            >
+              <div className="filters">
+                <label className="search-field">
+                  <Search size={18} />
+                  <input
+                    aria-label="Cari transaksi"
+                    value={query}
+                    onChange={(e) => {
+                      setQuery(e.target.value);
+                      setLimit(40);
+                    }}
+                    placeholder="Cari catatan atau kategori"
+                  />
+                </label>
+                <label className="sr-only" htmlFor="tx-month">
+                  Bulan transaksi
+                </label>
+                <select
+                  id="tx-month"
+                  value={txMonth}
+                  onChange={(e) => {
+                    setTxMonth(e.target.value);
+                    setLimit(40);
+                  }}
+                >
+                  <option value="">Semua bulan</option>
+                  {[
+                    ...new Set(
+                      wallet.transactions.map((t) => t.date.slice(0, 7)),
+                    ),
+                  ]
+                    .sort()
+                    .reverse()
+                    .map((m) => (
+                      <option key={m} value={m}>
+                        {periodRange("month", 0, `${m}-01`).label}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <div className="filter-row">
+                <div className="tabs" role="group" aria-label="Jenis transaksi">
+                  {(["all", "expense", "income"] as const).map((f) => (
+                    <button
+                      key={f}
+                      aria-pressed={filter === f}
+                      onClick={() => {
+                        setFilter(f);
+                        setLimit(40);
+                      }}
+                    >
+                      {f === "all"
+                        ? "Semua"
+                        : f === "expense"
+                          ? "Pengeluaran"
+                          : "Pemasukan"}
+                    </button>
+                  ))}
+                </div>
+                {(query || txMonth) && (
+                  <button
+                    className="text-button"
+                    onClick={() => {
+                      setQuery("");
+                      setTxMonth("");
+                    }}
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+              <div className="transaction-summary">
+                <span>
+                  Masuk{" "}
+                  <strong className="num">
+                    {money(totals(filtered).income)}
+                  </strong>
+                </span>
+                <span>
+                  Keluar{" "}
+                  <strong className="num">
+                    {money(totals(filtered).expense)}
+                  </strong>
+                </span>
+              </div>
+              {filtered.length ? (
+                rows(filtered.slice(0, limit))
+              ) : (
+                <Empty
+                  title={
+                    wallet.transactions.length
+                      ? "Tidak ada transaksi yang cocok."
+                      : "Belum ada transaksi."
+                  }
+                >
+                  {wallet.transactions.length
+                    ? "Coba kata lain atau ubah filter."
+                    : "Catat pemasukan atau pengeluaran pertamamu."}
+                </Empty>
+              )}
+              {filtered.length > limit && (
+                <button className="wide" onClick={() => setLimit(limit + 40)}>
+                  Tampilkan lagi ({limit} dari {filtered.length})
                 </button>
+              )}
+              <div className="list-footer">
+                <span>Ketuk transaksi untuk mengedit atau menghapus.</span>
                 <button
                   className="text-button"
-                  disabled={busy || !wallet.transactions.length}
+                  disabled={!filtered.length || busy}
                   onClick={() =>
                     void run(() =>
                       exportFile(
                         `saku-transaksi-${today()}.csv`,
-                        csv(ordered),
+                        csv(filtered),
                         "text/csv",
                       ),
                     )
                   }
                 >
                   <Download size={16} />
-                  Ekspor semua transaksi CSV
+                  CSV
                 </button>
-                <p className="hint">
-                  Cadangan berisi catatan keuanganmu. Simpan di tempat pribadi.
-                </p>
+              </div>
+            </Section>
+          )}
+          {page === "reports" && (
+            <>
+              <div className="report-controls">
+                <div className="tabs" role="group" aria-label="Periode laporan">
+                  {(["week", "month"] as const).map((p) => (
+                    <button
+                      key={p}
+                      aria-pressed={period === p}
+                      onClick={() => {
+                        setPeriod(p);
+                        setOffset(0);
+                      }}
+                    >
+                      {p === "week" ? "Mingguan" : "Bulanan"}
+                    </button>
+                  ))}
+                </div>
+                <div className="period-nav">
+                  <button
+                    className="icon-button"
+                    aria-label="Periode sebelumnya"
+                    onClick={() => setOffset(offset - 1)}
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <span>{range.label}</span>
+                  <button
+                    className="icon-button"
+                    disabled={offset === 0}
+                    aria-label="Periode berikutnya"
+                    onClick={() => setOffset(offset + 1)}
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
+              </div>
+              <section className="report-totals panel">
+                <div>
+                  <span>Surplus bersih</span>
+                  <strong
+                    className={`num lead ${report.net < 0 ? "negative" : ""}`}
+                    data-testid="report-net"
+                  >
+                    {money(report.net)}
+                  </strong>
+                  <small>
+                    {report.rate === null
+                      ? "Persentase belum tersedia tanpa pemasukan."
+                      : `${pct(report.rate)} dari pemasukan periode ini`}
+                  </small>
+                </div>
+                <div>
+                  <span>Pemasukan</span>
+                  <strong className="num">{money(report.income)}</strong>
+                  <small>
+                    {report.income + report.expense
+                      ? pct(
+                          (report.income / (report.income + report.expense)) *
+                            100,
+                        )
+                      : "0%"}{" "}
+                    dari total arus uang
+                  </small>
+                </div>
+                <div>
+                  <span>Pengeluaran</span>
+                  <strong className="num">{money(report.expense)}</strong>
+                  <small>
+                    {report.income + report.expense
+                      ? pct(
+                          (report.expense / (report.income + report.expense)) *
+                            100,
+                        )
+                      : "0%"}{" "}
+                    dari total arus uang
+                  </small>
+                </div>
+              </section>
+              <div className="overview-grid">
+                <Section
+                  title="Pemasukan & pengeluaran"
+                  action={
+                    <span className="muted">{scoped.length} transaksi</span>
+                  }
+                >
+                  <CashChart
+                    transactions={scoped}
+                    start={range.start}
+                    end={range.end}
+                  />
+                  <p className="chart-note">
+                    {report.income
+                      ? `${pct(report.expenseRate)} dari pemasukan terpakai untuk pengeluaran.`
+                      : "Tambahkan pemasukan untuk menghitung persentase surplus."}
+                  </p>
+                </Section>
+                <Section title="Dibanding periode lalu">
+                  <p className="comparison-period">
+                    {periodRange(period, offset - 1).label}
+                  </p>
+                  <p className="hint">
+                    Periode sebelumnya dihitung penuh. Periode berjalan bisa
+                    belum selesai.
+                  </p>
+                  {(["income", "expense", "net"] as const).map((k) => {
+                    const delta = report[k] - previous[k];
+                    return (
+                      <div className="comparison" key={k}>
+                        <span>
+                          {k === "income"
+                            ? "Pemasukan"
+                            : k === "expense"
+                              ? "Pengeluaran"
+                              : "Surplus"}
+                        </span>
+                        <strong
+                          className={`num ${delta === 0 ? "" : (k === "expense" ? delta > 0 : delta < 0) ? "negative" : "positive"}`}
+                        >
+                          {delta > 0 ? "+" : ""}
+                          {money(delta)}
+                        </strong>
+                        <small>
+                          {previous[k] > 0
+                            ? `${delta > 0 ? "+" : ""}${pct((delta / previous[k]) * 100)}`
+                            : "—"}{" "}
+                          · sebelumnya {money(previous[k])}
+                        </small>
+                      </div>
+                    );
+                  })}
+                </Section>
+                <Section
+                  title="Ke mana uangmu pergi?"
+                  className="category-panel"
+                  action={
+                    <select
+                      aria-label="Jenis rincian kategori"
+                      value={categoryKind}
+                      onChange={(e) => setCategoryKind(e.target.value as Kind)}
+                    >
+                      <option value="expense">Pengeluaran</option>
+                      <option value="income">Pemasukan</option>
+                    </select>
+                  }
+                >
+                  {breakdown(scoped, categoryKind).length ? (
+                    breakdown(scoped, categoryKind).map((c, i) => (
+                      <div className="category-row" key={c.name}>
+                        <div>
+                          <span>{c.name}</span>
+                          <span className="num">
+                            {money(c.amount)} <small>{pct(c.share)}</small>
+                          </span>
+                        </div>
+                        <div className="category-track">
+                          <span
+                            style={{
+                              width: `${c.share}%`,
+                              background:
+                                i === 0 ? "var(--chart)" : "var(--chart-muted)",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <Empty title="Belum ada rincian kategori.">
+                      Catatan pada periode ini akan muncul di sini.
+                    </Empty>
+                  )}
+                </Section>
+                <Section title="Cara membaca laporan">
+                  <div className="explanation">
+                    <p>
+                      <strong>Surplus = pemasukan − pengeluaran.</strong> Nilai
+                      positif berarti ada uang yang tersisa; nilai negatif
+                      berarti defisit.
+                    </p>
+                    <p>
+                      Persentase surplus dihitung dari pemasukan. Jika pemasukan
+                      nol, persentasenya ditampilkan sebagai tanda “—”.
+                    </p>
+                    <p>
+                      Porsi arus uang membandingkan setiap jenis dengan total
+                      pemasukan + pengeluaran, sehingga kedua porsinya selalu
+                      berjumlah 100% saat ada transaksi.
+                    </p>
+                    <p>
+                      Saldo awal dan alokasi tujuan tidak dihitung sebagai
+                      pemasukan atau pengeluaran.
+                    </p>
+                  </div>
+                </Section>
+              </div>
+            </>
+          )}
+          {page === "goals" && (
+            <>
+              <div className="goals-summary panel">
+                <span>
+                  Sudah disisihkan
+                  <strong className="num">{money(balance.reserved)}</strong>
+                </span>
+                <span>
+                  Masih tersedia
+                  <strong className="num">{money(balance.available)}</strong>
+                </span>
+              </div>
+              {wallet.goals.length ? (
+                <div className="goals-grid">
+                  {wallet.goals.map((g) => {
+                    const p = goalPlan(g);
+                    return (
+                      <Section
+                        title={g.name}
+                        key={g.id}
+                        action={
+                          <button
+                            className="icon-button"
+                            aria-label={`Edit tujuan ${g.name}`}
+                            onClick={() => open({ kind: "goal", goal: g })}
+                          >
+                            <Pencil size={17} />
+                          </button>
+                        }
+                      >
+                        <div className="goal-amount num">
+                          {money(g.saved)}
+                          <span>dari {money(g.target)}</span>
+                        </div>
+                        <progress
+                          value={g.saved}
+                          max={g.target}
+                          aria-label={`Progres ${g.name}`}
+                        />
+                        <div className="key-value">
+                          <span>{pct(p.progress)} terkumpul</span>
+                          <span>{dateLabel(g.deadline, true)}</span>
+                        </div>
+                        <div className="goal-pace">
+                          {p.remaining === 0 ? (
+                            <>
+                              <Check size={19} />
+                              <p>Target tercapai. Kamu berhasil!</p>
+                            </>
+                          ) : (
+                            <>
+                              <Target size={19} />
+                              <p>
+                                {p.overdue
+                                  ? "Target waktumu sudah lewat."
+                                  : `Sisihkan ${money(p.daily)} per hari.`}
+                                <small>
+                                  {p.overdue
+                                    ? `Masih kurang ${money(p.remaining)}. Atur ulang tanggal target.`
+                                    : `${p.days} hari termasuk hari ini · sisa ${money(p.remaining)}`}
+                                </small>
+                              </p>
+                            </>
+                          )}
+                        </div>
+                        <button
+                          className="wide"
+                          onClick={() => open({ kind: "allocate", goal: g })}
+                        >
+                          {p.remaining === 0
+                            ? "Kelola tabungan"
+                            : "Sisihkan uang"}
+                          <ArrowRight size={17} />
+                        </button>
+                      </Section>
+                    );
+                  })}
+                </div>
+              ) : (
+                <Section title="Yang ingin kamu wujudkan">
+                  <Empty
+                    title="Keinginan kecil, rencana yang nyata."
+                    action={
+                      <button
+                        className="primary"
+                        onClick={() => open({ kind: "goal" })}
+                      >
+                        <Plus size={18} />
+                        Buat tujuan pertama
+                      </button>
+                    }
+                  >
+                    Tentukan nominal dan tanggal. Saku menghitung berapa yang
+                    perlu kamu sisihkan setiap hari.
+                  </Empty>
+                </Section>
+              )}
+              <p className="privacy-line">
+                <WalletIcon size={16} />
+                Alokasi tujuan tidak memindahkan uang ke rekening lain. Catat
+                pengeluaran saat uang benar-benar dipakai.
+              </p>
+            </>
+          )}
+          {page === "settings" && (
+            <div className="settings-layout">
+              <Section title="Profil & anggaran">
+                <form
+                  key={`${wallet.name}-${wallet.opening}-${wallet.budget}`}
+                  onSubmit={onSubmit(async (f) =>
+                    commit(
+                      {
+                        ...wallet,
+                        name: formText(f, "name"),
+                        opening: parseAmount(formText(f, "opening"), true),
+                        budget: parseAmount(formText(f, "budget"), true),
+                      },
+                      "Pengaturan tersimpan.",
+                    ),
+                  )}
+                >
+                  <label>
+                    Nama panggilan
+                    <input
+                      name="name"
+                      defaultValue={wallet.name}
+                      required
+                      maxLength={40}
+                    />
+                  </label>
+                  <AmountField
+                    label="Saldo awal pencatatan"
+                    name="opening"
+                    value={wallet.opening}
+                    zero
+                  />
+                  <p className="hint">
+                    Mengubah saldo awal mengubah saldo total. Untuk uang baru,
+                    tambahkan transaksi pemasukan.
+                  </p>
+                  <AmountField
+                    label="Anggaran pengeluaran bulanan"
+                    name="budget"
+                    value={wallet.budget}
+                    zero
+                  />
+                  <p className="hint">
+                    Batas yang sama dipakai setiap bulan. Isi 0 untuk
+                    menonaktifkan.
+                  </p>
+                  <button className="primary" disabled={busy}>
+                    Simpan pengaturan
+                  </button>
+                </form>
               </Section>
-              <Section title="Tentang Saku">
-                <div className="about-brand">
-                  <Mark />
-                  <span>saku.</span>
-                  <small>v1.0.0</small>
-                </div>
-                <p className="muted">
-                  Ruang kecil untuk kebiasaan finansial yang lebih baik. Dibuat
-                  untuk pemakaian pribadi, tanpa akun dan tanpa iklan.
-                </p>
-                <div className="key-value">
-                  <span>Transaksi tersimpan</span>
-                  <span>{wallet.transactions.length}</span>
-                </div>
-                <div className="key-value">
-                  <span>Tujuan aktif</span>
-                  <span>{wallet.goals.length}</span>
-                </div>
-              </Section>
+              <div className="settings-side">
+                <Section title="Cadangan & data">
+                  <p className="muted">
+                    Catatan tersimpan di perangkat ini. Simpan cadangan secara
+                    berkala, terutama sebelum mengganti HP atau menghapus
+                    aplikasi.
+                  </p>
+                  <button
+                    className="wide"
+                    disabled={busy}
+                    onClick={() =>
+                      void run(() =>
+                        exportFile(
+                          `saku-cadangan-${today()}.json`,
+                          JSON.stringify(wallet, null, 2),
+                        ),
+                      )
+                    }
+                  >
+                    <Download size={17} />
+                    Ekspor cadangan JSON
+                  </button>
+                  <button
+                    className="wide"
+                    disabled={busy}
+                    onClick={() => importRef.current?.click()}
+                  >
+                    <Upload size={17} />
+                    Impor cadangan JSON
+                  </button>
+                  <button
+                    className="text-button"
+                    disabled={busy || !wallet.transactions.length}
+                    onClick={() =>
+                      void run(() =>
+                        exportFile(
+                          `saku-transaksi-${today()}.csv`,
+                          csv(ordered),
+                          "text/csv",
+                        ),
+                      )
+                    }
+                  >
+                    <Download size={16} />
+                    Ekspor semua transaksi CSV
+                  </button>
+                  <p className="hint">
+                    Cadangan berisi catatan keuanganmu. Simpan di tempat
+                    pribadi.
+                  </p>
+                </Section>
+                <Section title="Tentang Saku">
+                  <div className="about-brand">
+                    <Mark />
+                    <span>saku.</span>
+                    <small>v1.2.0</small>
+                  </div>
+                  <p className="muted">
+                    Ruang kecil untuk kebiasaan finansial yang lebih baik.
+                    Dibuat untuk pemakaian pribadi, tanpa akun dan tanpa iklan.
+                  </p>
+                  <div className="key-value">
+                    <span>Transaksi tersimpan</span>
+                    <span>{wallet.transactions.length}</span>
+                  </div>
+                  <div className="key-value">
+                    <span>Tujuan aktif</span>
+                    <span>{wallet.goals.length}</span>
+                  </div>
+                </Section>
+              </div>
             </div>
-          </div>
-        )}
-        <footer className="app-footer">
-          <span>Saku · Ruang untuk rencana baik.</span>
-          <span>Rupiah Indonesia</span>
-        </footer>
+          )}
+          <footer className="app-footer">
+            <span>Saku · Ruang untuk rencana baik.</span>
+            <span>Rupiah Indonesia</span>
+          </footer>
+        </div>
       </main>
       {hiddenImport}
       {confirmation}

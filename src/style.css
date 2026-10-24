@@ -206,6 +206,12 @@ strong {
   color: var(--muted);
   padding: 10px 12px;
   border-radius: 6px;
+  transition:
+    color 0.22s,
+    background 0.22s;
+}
+.nav-indicator {
+  display: none;
 }
 .sidebar nav a[aria-current="page"] {
   background: #e5e8ec;
@@ -252,6 +258,41 @@ strong {
   border-radius: var(--radius);
   padding: 22px;
   min-width: 0;
+}
+.money-advice {
+  margin-bottom: 16px;
+}
+.advice-list {
+  display: flex;
+  gap: 20px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.advice-list li {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.advice-list li + li {
+  border-left: 1px solid var(--border);
+  padding-left: 20px;
+}
+.advice-list h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.advice-list p {
+  color: var(--muted);
+}
+.advice-list .advice-tip {
+  margin-top: 10px;
+  color: var(--text);
+}
+.money-advice > .hint {
+  margin-top: 16px;
 }
 .section-head {
   display: flex;
@@ -1197,6 +1238,8 @@ dialog::backdrop {
     grid-template-columns: repeat(5, 1fr);
     gap: 0;
     height: 100%;
+    position: relative;
+    user-select: none;
   }
   .sidebar nav a {
     display: flex;
@@ -1214,13 +1257,33 @@ dialog::backdrop {
     color: var(--text);
     font-weight: 500;
   }
-  .sidebar nav a[aria-current="page"]:before {
-    content: "";
+  .nav-indicator {
+    display: block;
     position: absolute;
     top: 0;
+    left: 0;
+    width: 20%;
+    height: 2px;
+    pointer-events: none;
+    transform: translateX(calc(var(--nav-index) * 100%));
+    transition: transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .nav-indicator::before {
+    content: "";
+    display: block;
     width: 24px;
     height: 2px;
+    margin: auto;
     background: var(--text);
+  }
+  .advice-list {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .advice-list li + li {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+    padding: 16px 0 0;
   }
   .sidebar nav a svg {
     width: 20px;

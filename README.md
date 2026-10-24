@@ -6,12 +6,18 @@ Aplikasi Android pribadi untuk mencatat uang jajan, melihat arus kas, dan menabu
 
 ## Memasang
 
-1. Unduh `Saku-1.0.0.apk` ke HP Android.
+1. Unduh `Saku-1.2.0.apk` ke HP Android.
 2. Buka file. Jika Android meminta, izinkan **Instal aplikasi tidak dikenal** untuk browser/pengelola file yang digunakan.
 3. Pasang Saku dan isi nama, saldo awal, serta anggaran bulanan (opsional).
 4. Cabut kembali izin pemasangan dari sumber tersebut setelah selesai.
 
 Paket: `com.velorastudio.saku`. APK release ditandatangani dengan kunci pribadi Saku. Untuk pembaruan, gunakan paket dan kunci yang sama, naikkan `versionCode`, lalu pasang di atas aplikasi lama. Jangan hapus aplikasi sebelum memperbarui: data lokal ikut terhapus saat uninstall.
+
+## Pembaruan 1.2.0
+
+- Geser horizontal pada halaman atau navbar ponsel untuk berpindah satu menu. Indikator navbar bergeser dan halaman masuk dengan transisi singkat. Scroll vertikal, form, dan tabel yang dapat digeser tetap memakai interaksi aslinya. Preferensi pengurangan animasi perangkat dihormati.
+- **Catatan Saku** di Ringkasan memberi komentar dan saran otomatis dari transaksi lokal: anggaran atau pemasukan yang terpakai setidaknya 80%, pemasukan naik setidaknya 50% dibanding rentang hari yang sama pada bulan sebelumnya, serta peluang menabung saat surplus setidaknya 30% dari pemasukan. Nominal saran menabung memakai 20% dari nilai terendah antara surplus bulan ini dan saldo tersedia, minimal nol. Saran tidak mengubah saldo atau membuat transaksi.
+- UI memakai arah Taste Skill yang sama; Ponytail diterapkan dengan perubahan terbatas tanpa dependensi baru. Sesuai permintaan, tes otomatis, inspector desain, dan lint tambahan tidak dijalankan untuk pembaruan ini; hanya build produksi dan pengemasan APK. Hasil tes di dokumen validasi berlaku untuk versi 1.0.0.
 
 ## Fitur
 
