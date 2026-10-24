@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#17191C</color>
+    <color name="colorPrimaryDark">#F2F4F7</color>
+    <color name="colorAccent">#17191C</color>
+    <color name="saku_ground">#F2F4F7</color>
+    <color name="saku_icon_bg">#17191C</color>
+</resources>
