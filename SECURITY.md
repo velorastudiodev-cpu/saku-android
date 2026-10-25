@@ -41,3 +41,7 @@ Pengujian di perangkat untuk migrasi dari 1.2.x, pembukaan ulang setelah proses 
 - Widget memakai PendingIntent immutable ke MainActivity. Tindakan Catat hanya membuka form, tidak membuat transaksi. Dua nominal ringkasan disimpan dalam preferensi privat hanya setelah persetujuan; kunci aplikasi menghapusnya, dan receiver memeriksa status kunci sebelum menampilkan angka.
 - Izin USE_BIOMETRIC ditambahkan untuk autentikasi sistem. PIN/pola/sandi diverifikasi OS beserta pembatasan percobaannya, bukan JavaScript. FLAG_SECURE aktif selama kunci aplikasi diaktifkan. Pemilik yang mematikan kunci layar perangkat perlu mengatur kunci layar kembali untuk memverifikasi Saku.
 - Saldo awal gabungan harus sama dengan jumlah saldo awal dompet. Referensi dompet, ID transfer, kategori anggaran, tanggal, dan nominal diperiksa pada impor/penyimpanan. Transfer tersimpan terpisah dari transaksi income/expense.
+
+## Dependensi pengembangan
+
+Dependabot menandai `uuid` lama melalui `@capacitor/cli → xcode`. Override khusus `xcode.uuid` memakai **11.1.1**, versi perbaikan bounds-check v3/v5/v6 yang masih mendukung CommonJS. Xcode parser dan pembuatan ID v4 diperiksa setelah perubahan. Dependensi ini hanya alat pengembangan, tidak dibundel ke APK; ID transaksi aplikasi memakai `crypto.randomUUID()`. Override dapat dilepas ketika dependensi upstream sudah memakai versi perbaikan yang kompatibel.

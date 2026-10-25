@@ -39,3 +39,5 @@ Tidak menjalankan UI end-to-end, emulator, perangkat fisik, atau screenshot sesu
 ## Arah desain dan sumber
 
 Ponytail dipakai untuk mengikuti pola penyimpanan dan komponen yang sudah ada, serta autentikasi OS tanpa sistem login/PIN baru. Taste Skill mempertahankan **Achromatic ledger**, seed `1792834316`, Geist lokal, dasar abu-abu netral, dan satu warna utama pada grafik. Tidak mengganti arah visual. Logo berasal dari gambar pemilik, dengan pemisahan latar melalui alat pengolahan gambar. Tidak ada aset stok, data demo, atau layanan AI online dalam aplikasi rilis. Tidak ada skor inspeksi visual yang diklaim karena screenshot tidak dijalankan.
+
+Dependabot menandai `uuid` pada dependensi pengembangan pembuat proyek Xcode saat push. Dependensi tersebut diperbarui ke 11.1.1 melalui override terarah; parser proyek dan pembuatan ID tetap berfungsi. Kode ini tidak masuk APK dan perubahan tidak mengubah aset runtime rilis.
