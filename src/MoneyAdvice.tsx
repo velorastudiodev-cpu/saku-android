@@ -50,7 +50,7 @@ export function MoneyAdvice({ wallet }: { wallet: Wallet }) {
         month.expense > month.income
           ? "Pengeluaran melampaui pemasukan"
           : "Sebagian besar pemasukan terpakai",
-      comment: `${money(month.expense)} keluar dari ${money(month.income)} yang masuk bulan ini (${pct(month.expenseRate)}).`,
+      comment: `${money(month.expense)} keluar dan ${money(month.income)} masuk bulan ini. Arus kas bersih ${money(month.net)}; saldo awal tidak termasuk pemasukan bulan ini.`,
       tip: reviewExpense,
     });
   } else if (month.expense > 0 && month.income === 0) {

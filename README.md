@@ -1,83 +1,92 @@
 # Saku
 
-**Catatan keuangan Android yang bisa dipakai sepenuhnya offline.**
+<img src="public/saku-logo.png" alt="Logo Saku" width="96" height="96" />
 
-Saku membantu Anda mengetahui ke mana uang pergi, membatasi pengeluaran, dan menyisihkan uang untuk hal yang berarti. Catat pemasukan atau pengeluaran dalam rupiah, lalu lihat saldo, pola belanja, dan kemajuan tabungan dalam satu aplikasi. Dibuat oleh **Velora Studio Dev** untuk orang yang ingin mengatur keuangan sehari-hari tanpa akun, iklan, atau pengaturan yang rumit.
+**Catatan keuangan pribadi yang cepat, privat, dan sepenuhnya offline.**
 
-**[Unduh Saku 1.2.5](https://github.com/velorastudiodev-cpu/saku-android/releases/tag/v1.2.5)** · [Privasi](PRIVACY.md) · [Keamanan](SECURITY.md)
+Saku membantu Anda mengetahui uang yang masih bisa dipakai, mengurangi pengeluaran, dan menabung untuk keinginan. Pisahkan tunai, rekening, serta e-wallet; catat uang masuk dan keluar; lalu lihat anggaran dan saran berdasarkan catatan Anda. Dibuat oleh **Velora Studio Dev**, tanpa login, iklan, backend, atau AI online.
 
-Android **7.0+**, dengan Android System WebView yang diperbarui. Bahasa Indonesia, rupiah utuh. Saat ini dalam persiapan peluncuran publik: repositori masih privat dan unduhan memerlukan akses GitHub. Saku belum dirilis di Google Play.
+**[Unduh APK Saku 1.5.0](https://github.com/velorastudiodev-cpu/saku-android/releases/download/v1.5.0/Saku-1.5.0.apk)** · [Semua berkas rilis](https://github.com/velorastudiodev-cpu/saku-android/releases/tag/v1.5.0) · [Privasi](PRIVACY.md) · [Keamanan](SECURITY.md)
 
-## Yang bisa Anda lakukan
+Android **7.0+** dengan Android System WebView yang diperbarui. Bahasa Indonesia, rupiah utuh. Repositori dan APK publik; belum diterbitkan di Google Play. **Proyek iOS 15.4+ tersedia, tetapi belum dikompilasi dengan Xcode atau dikonfirmasi di iPhone. Belum ada IPA/TestFlight.** [Status iOS](docs/IOS.md).
 
-| Kebutuhan | Fitur Saku |
+## Yang baru di 1.5
+
+Pembaruan ini menggabungkan tahap 1.3–1.5: pengalaman harian, pengelolaan uang, dan insight offline.
+
+| Kebutuhan | Fitur dan lokasi |
 | --- | --- |
-| Mengetahui uang yang masih bisa dipakai | Saldo total, saldo tersedia setelah alokasi tabungan, dan ruang jajan harian. |
-| Mengurangi pengeluaran tanpa menebak | Anggaran bulanan, kategori belanja, dan Catatan Saku berisi komentar serta saran dari transaksi Anda. |
-| Mencatat uang sehari-hari | Tambah, edit, hapus, cari, dan filter pemasukan/pengeluaran berdasarkan tanggal dan kategori. |
-| Memahami kebiasaan | Grafik mingguan/bulanan, rincian kategori, surplus bersih, dan persentasenya. |
-| Menabung untuk keinginan | Tujuan dengan nominal, tanggal target, progres, alokasi uang, dan estimasi yang perlu disisihkan per hari. |
-| Menjaga dan memindahkan catatan | Ekspor JSON untuk cadangan, impor dengan konfirmasi, dan ekspor CSV untuk spreadsheet. |
+| Memisahkan uang tunai, bank, e-wallet | **Transaksi → Dompet & transfer**. Saldo per dompet, pemindahan uang tanpa menambah pemasukan/pengeluaran, serta riwayat transfer. |
+| Mengingat uang jajan atau tagihan | **Transaksi → Transaksi berulang**. Jadwal mingguan/bulanan, konfirmasi atau otomatis saat aplikasi dibuka, pengingat lokal opsional. |
+| Membatasi belanja | Anggaran bulanan keseluruhan serta **Pengaturan → Anggaran kategori**. Peringatan dalam aplikasi pada 80% dan 100%. |
+| Memutuskan belanja hari ini | **Ringkasan → Boleh Jajan?**. Simulasi nominal dan kategori, memperhitungkan saldo, tujuan tabungan, pengeluaran hari ini, dan kebutuhan terjadwal. |
+| Memahami pola pengeluaran | **Saku Insight**: perbandingan tujuh hari, kategori Lainnya yang dominan, perkiraan akhir bulan, dan peluang penghematan. Semua dihitung lokal. |
+| Mencatat dan memperbaiki kesalahan | Tambah/edit/hapus transaksi, pencarian, filter bulan/jenis/dompet, kategori custom, ubah kategori massal, serta **Urungkan** selama 10 detik. |
+| Melihat angka yang mudah dipahami | Ringkasan lebih singkat; laporan minggu/bulan dengan arus kas bersih dalam rupiah. Persentase tersedia sebagai rincian dengan dasar perhitungan. |
+| Menabung untuk tujuan | Nominal dan tenggat tujuan, alokasi/penarikan tabungan, progres, dan estimasi tabungan harian. |
+| Menjaga privasi tanpa akun | **Pengaturan → Privasi & akses cepat**: kunci aplikasi opsional memakai biometrik atau PIN/pola/sandi layar perangkat. |
+| Mencatat dari layar utama | **Widget Android** untuk saldo tersedia, sisa anggaran, dan tombol Catat. Nominal disembunyikan secara default; tampilan angka perlu diaktifkan sendiri. |
+| Memindahkan data | Cadangan JSON berpassword, impor tervalidasi dengan konfirmasi, CSV transaksi untuk spreadsheet. |
 
-Geser kiri/kanan pada halaman atau navbar untuk berpindah menu. Scroll vertikal tetap untuk membaca; form dan tabel menggunakan interaksinya sendiri. Animasi mengikuti preferensi pengurangan gerak perangkat.
+Logo memakai gambar dari pemilik yang telah dipisahkan dari latar. Tampilan tetap netral, dengan transisi tab, angka, grafik, tanda berhasil, dan progres tujuan yang halus serta menghormati preferensi pengurangan gerak. Geser kiri/kanan halaman atau navbar untuk berpindah menu; scroll vertikal untuk membaca.
 
-Saku adalah pencatat keuangan. Aplikasi tidak mengakses bank, memindahkan uang, atau menjamin hasil tabungan. Saran dihitung di perangkat berdasarkan catatan Anda dan tidak mengubah saldo secara otomatis.
+## Memasang atau memperbarui
 
-## Mulai menggunakan
+1. Unduh `Saku-1.5.0.apk` dari tautan resmi di atas. AAB adalah berkas distribusi untuk Play Console, bukan berkas instalasi langsung.
+2. **Jika sudah memakai Saku, ekspor cadangan terlebih dahulu.** Pasang pembaruan di atas aplikasi lama; jangan uninstall atau hapus data. ID paket dan sertifikat tetap sama.
+3. Android dapat meminta izin memasang aplikasi dari browser/pengelola file. Jika Play Protect meminta pemeriksaan, ikuti proses resmi Google.
+4. Data lama otomatis masuk ke **Dompet utama**, dengan saldo dan riwayat tetap. Tambahkan dompet lain dan gunakan transfer untuk membagi uang yang sudah tercatat.
 
-1. Dari halaman rilis, buka **Assets** dan unduh `Saku-1.2.5.apk`.
-2. Buka APK. Android dapat meminta izin memasang aplikasi dari browser/pengelola file tersebut; cabut kembali izin setelah pemasangan selesai.
-3. Jika Play Protect menawarkan pemeriksaan, ikuti proses resmi Google. Jangan menonaktifkan perlindungannya.
-4. Isi nama panggilan, saldo awal, dan anggaran bulanan opsional. Mulai catat transaksi pertama Anda.
+Skema cadangan terbaru adalah **v3** dan memerlukan Saku 1.5 atau lebih baru. Cadangan lama skema v1/v2 tetap dapat diimpor. Jangan downgrade setelah migrasi. Pembaruan ini belum diuji langsung pada perangkat; simpan cadangan lama secara terpisah.
 
-**Pembaruan dari versi lama:** ekspor cadangan JSON terlebih dahulu, lalu pasang APK di atas aplikasi yang sudah ada. Jangan uninstall atau hapus data. Versi 1.2.5 memakai paket dan kunci tanda tangan yang sama serta memigrasikan catatan Android ke penyimpanan terenkripsi.
+Kode atau tanda tangan tidak menjamin peringatan Play Protect hilang. Verifikasi developer dan review toko aplikasi merupakan proses pemilik akun melalui konsol resmi. [Panduan distribusi](docs/PUBLIC-RELEASE.md).
 
-Permintaan pemeriksaan untuk APK yang belum dikenal dapat muncul pada pemasangan di luar Google Play; perubahan kode tidak menjamin peringatan tersebut hilang. Detail dan jalur distribusi resmi ada pada [panduan peluncuran](docs/PUBLIC-RELEASE.md) dan [bantuan Google Play Protect](https://support.google.com/accounts/answer/2812853?hl=id). Jika Google menyatakan APK berbahaya, hentikan pemasangan dan laporkan versi/pesannya kepada pengembang.
+## Jadwal, widget, dan kunci aplikasi
 
-## Pembaruan 1.2.5
+**Jadwal:** mode konfirmasi menunggu tombol Catat. Mode otomatis memproses kejadian saat aplikasi dibuka/aktif, bukan ketika aplikasi sudah ditutup. Maksimal 100 kejadian per batch; cursor dan transaksi disimpan bersama untuk mencegah duplikasi. Jadwal akhir bulan mempertahankan tanggal asal. Jadwal hanya mencatat uang, tidak memindahkan dana bank.
 
-- APK tidak memiliki izin internet; fungsi inti tetap tersedia tanpa koneksi.
-- Catatan Android dienkripsi dengan AES-256-GCM dan kunci Android Keystore. Migrasi mempertahankan salinan lama sampai data terenkripsi berhasil disimpan dan dibaca kembali.
-- Berbagi berkas dibatasi pada direktori ekspor; akses WebView dan konten produksi diperketat, debugging serta log runtime dinonaktifkan.
-- Penjelasan produk, privasi, keamanan, dan proses peluncuran diperjelas. Copyright Velora Studio Dev tampil di bagian bawah halaman.
+**Pengingat:** setelah izin diberikan, kejadian berikutnya dijadwalkan pukul 09.00 waktu perangkat. Notifikasi tidak memuat nominal atau catatan. Buka Saku untuk memperbarui pengingat berikutnya; OS dapat menundanya karena baterai/fokus. Tidak meminta izin alarm presisi.
 
-Pematangan ini mengikuti Ponytail dengan menggunakan API Android yang tersedia, tanpa layanan cloud atau dependensi baru. Build produksi dilakukan; pengujian langsung, screenshot, dan rangkaian tes otomatis tidak dijalankan untuk versi ini sesuai permintaan pemilik. Hasil pengujian di [dokumen validasi lama](docs/VALIDATION.md) hanya berlaku bagi versi 1.0.0. Versi 1.2.5 belum diaudit secara independen.
+**Widget:** tekan lama layar utama Android → Widget → Saku. Saldo dan anggaran diperbarui ketika Saku dibuka atau data disimpan, dengan tanggal pembaruan terlihat. Widget tidak menjalankan transaksi berulang. Pada pergantian bulan, buka Saku untuk memperbarui anggaran. Jika kunci aplikasi aktif, angka widget disembunyikan dan izinnya direset. Widget tersedia untuk Android; tidak ada widget iOS pada versi ini.
 
-## Privasi yang perlu diketahui
+**Kunci:** memakai autentikasi perangkat, bukan PIN baru yang disimpan Saku. Android 7–9 memakai kunci layar; Android 10+ memakai dialog biometrik/kredensial sistem yang tersedia. Perubahan pengaturan juga meminta autentikasi. Saat aktif, akses berkas native diperiksa, tampilan dilindungi ketika aplikasi tidak aktif, dan screenshot Android dibatasi. Implementasi iOS memakai LocalAuthentication; belum diverifikasi dengan Xcode/perangkat.
 
-Tidak ada akun, backend, analitik, iklan, atau pengunggahan catatan otomatis. Data Android disimpan di ruang privat aplikasi dan dienkripsi. **Gunakan kunci layar perangkat:** Saku belum memiliki PIN/biometrik aplikasi terpisah dan tidak menjanjikan keamanan mutlak terhadap perangkat yang disusupi.
-
-**JSON/CSV hasil ekspor tidak dienkripsi.** Simpan file tersebut secara pribadi. Membagikannya kepada aplikasi lain mengikuti pilihan Anda dan kebijakan aplikasi penerima. Salinan cache ekspor yang lebih dari 24 jam dicoba dibersihkan saat Saku dibuka kembali.
-
-Cadangan otomatis dan transfer data Android dinonaktifkan. Uninstall, hapus data, atau kehilangan kunci dapat membuat catatan tidak dapat dipulihkan tanpa cadangan JSON. Ekspor berkala dan sebelum berpindah HP. [Baca kebijakan privasi lengkap](PRIVACY.md).
+**Urungkan:** mengembalikan perubahan terakhir yang mendukung Undo selama 10 detik, sebelum perubahan berikutnya atau aplikasi ditutup/dikunci. Pemulihan cadangan, pengaturan privasi, dan pencatatan otomatis tidak memakai Undo.
 
 ## Cara angka dihitung
 
-| Angka | Rumus |
+| Angka | Dasar perhitungan |
 | --- | --- |
-| Saldo total | Saldo awal + seluruh pemasukan − seluruh pengeluaran |
-| Saldo tersedia | Saldo total − jumlah alokasi tujuan |
-| Surplus periode | Pemasukan periode − pengeluaran periode |
-| Persentase surplus | Surplus ÷ pemasukan × 100%; “—” jika pemasukan nol |
-| Porsi arus uang | Masing-masing jenis ÷ (pemasukan + pengeluaran) × 100% |
-| Kebutuhan tabungan harian | Pembulatan ke atas dari sisa target ÷ hari hingga tenggat, termasuk hari ini |
-| Ruang jajan harian | Nilai terendah saldo tersedia dan sisa anggaran ÷ hari tersisa dalam bulan; tanpa anggaran hanya saldo tersedia |
+| Saldo dompet | Saldo awal dompet + pemasukan − pengeluaran + transfer masuk − transfer keluar |
+| Saldo total | Jumlah saldo seluruh dompet; transfer internal saling meniadakan |
+| Saldo tersedia | Saldo total − seluruh alokasi tujuan |
+| Arus kas bersih periode | Pemasukan − pengeluaran pada minggu/bulan tersebut; saldo awal dan transfer bukan pemasukan |
+| Sisa anggaran | Batas bulanan − pengeluaran bulan tersebut |
+| Kebutuhan terjadwal | Pengeluaran berulang aktif yang belum dicatat hingga akhir bulan, termasuk yang lewat jatuh tempo |
+| Perkiraan akhir bulan | Pengeluaran tercatat + rata-rata harian sejak catatan pengeluaran pertama bulan ini × hari mendatang; tampil setelah rentang catatan minimal tujuh hari |
 
-Alokasi tujuan tidak mengubah saldo total. Menghapus tujuan melepas alokasi ke saldo tersedia. Saat membeli barang tujuan, kembalikan alokasinya lalu catat pengeluaran sebenarnya. Saldo negatif tetap terlihat. Minggu laporan dimulai Senin; perbandingan laporan memakai periode sebelumnya secara penuh.
+**Boleh Jajan?** mengambil nilai terendah dari saldo tersedia dan sisa anggaran (jika diatur), lalu mengurangi kebutuhan terjadwal. Dana ini minimal nol. Ruang hari ini = nilai terkecil dana tersebut dan `floor((dana + pengeluaran hari ini) / sisa hari termasuk hari ini) − pengeluaran hari ini`, minimal nol. Memilih kategori juga membatasi simulasi pada sisa anggaran kategori. Pemasukan yang belum diterima tidak dihitung.
 
-Catatan Saku menyoroti pengeluaran yang mencapai 80% anggaran/pemasukan, pemasukan yang naik setidaknya 50% dibanding rentang hari sebanding pada bulan sebelumnya, dan peluang menabung saat surplus mencapai 30% pemasukan. Nominal saran tabungan adalah 20% dari nilai terendah surplus bulan ini dan saldo tersedia, minimal nol. Ini patokan sederhana, bukan penilaian lengkap atas kondisi keuangan Anda.
+Contoh: dana Rp210.000 untuk enam hari menghasilkan Rp35.000 hari ini. Setelah belanja Rp25.000, ruang tersisa Rp10.000. Ini contoh perhitungan, bukan data pengguna. Kebutuhan wajib harus dimasukkan sebagai jadwal; catatan yang tidak lengkap memengaruhi hasil. Saran dan perkiraan bukan jaminan finansial.
 
-## Untuk pengembang
+Alokasi tujuan tidak memindahkan uang nyata atau mengubah saldo total. Saat membeli barang tujuan, kembalikan alokasinya lalu catat pengeluaran. Menghapus tujuan melepas alokasi. Saldo minus tetap ditampilkan. Dompet yang masih dipakai tidak dapat dihapus; transfer yang salah dapat dihapus dan dicatat ulang.
 
-React + TypeScript + Vite + Capacitor. Data JSON skema v1; maksimal 20.000 transaksi, 100 tujuan, dan Rp1 triliun per nominal. Impor dibatasi 10 MB dan divalidasi sebelum konfirmasi. Browser memakai penyimpanan browser; enkripsi Android Keystore khusus APK.
+## Privasi dan cadangan
+
+Tidak ada server, login, analitik, iklan, atau pengunggahan otomatis. APK tidak memiliki izin internet. Catatan Android dienkripsi AES-256-GCM dengan Android Keystore; proyek iOS memakai CryptoKit/Keychain. Browser pengembangan memakai penyimpanan browser, dengan perlindungan berbeda dari aplikasi native.
+
+**JSON baru dienkripsi dengan kata sandi; CSV dan JSON lama tidak dienkripsi.** Tidak ada pemulihan kata sandi melalui server. Cadangkan secara berkala, terutama sebelum mengganti HP, uninstall, atau menghapus data. Backup/transfer otomatis Android dinonaktifkan. Widget yang diizinkan menampilkan angka menyimpan dua nominal ringkasan pada penyimpanan privatnya; rincian dan pilihan ada di [kebijakan privasi](PRIVACY.md).
+
+## Mengembangkan dan membangun
+
+React + TypeScript + Vite + Capacitor. Node.js 22+, JDK 21, Android SDK platform 36/build-tools 36.0.0.
 
 ```bash
 npm ci
 npm run dev
 npm run build
+npm test
 ```
-
-Node.js 22+, JDK 21, Android SDK platform 36 dan build-tools 36.0.0. Build APK dan AAB:
 
 ```bash
 export ANDROID_HOME=/lokasi/android-sdk
@@ -87,12 +96,14 @@ export SAKU_STORE_PASSWORD_FILE=/lokasi/privat/release-password.txt
 bash scripts/build-android.sh
 ```
 
-ID paket: `com.velorastudio.saku`, versionCode `3`, versionName `1.2.5`. APK dan AAB yang ditandatangani serta SHA-256 berada dalam `artifacts/`. AAB untuk persiapan Play Console dan tidak dapat dipasang langsung seperti APK. Kunci/kata sandi penandatanganan tidak masuk repositori. Jika menggunakan Play App Signing, ikuti [panduan kontinuitas kunci](docs/PUBLIC-RELEASE.md) sebelum mengunggah ke Play.
+ID paket `com.velorastudio.saku`, versionCode **5**, versionName **1.5.0**. APK/AAB bertanda tangan dan SHA-256 masuk `artifacts/`; kunci tidak masuk repo. [Panduan iOS](docs/IOS.md).
 
-Tes tersedia melalui `npm test` dan `npm run test:e2e`, tetapi belum dijalankan ulang pada versi 1.2.5. Catatan desain awal ada di [rencana](docs/PLAN.md). Screenshot dan fixture lama menggunakan data contoh Dira; data tersebut tidak masuk APK.
+Batas data: 30 dompet, 20.000 transaksi, 20.000 transfer, 100 tujuan, 50 jadwal, 50 kategori custom per jenis; nominal serta jumlah saldo awal maksimal Rp1 triliun. Impor plaintext maksimal 10 MB, berkas terenkripsi maksimal 16 MB; penyimpanan native membatasi plaintext 10 MB. Skema divalidasi sebelum penulisan.
+
+Ponytail dan Taste Skill digunakan; arah visual **Achromatic ledger**, seed `1792834316`. Pemeriksaan logika penting dan build Android dijalankan. Tidak ada screenshot atau pengujian UI/perangkat langsung; detail ada di [catatan rilis 1.5](docs/RELEASE-1.5.md). Fixture pengembangan bukan data bawaan pengguna.
 
 ## Bantuan
 
-Gunakan Issues repositori untuk bug dan saran apabila akses tersedia. Sertakan versi Saku, versi Android, dan langkah terjadinya masalah. Jangan mengunggah cadangan keuangan atau kredensial ke laporan publik. Kerentanan keamanan mengikuti [SECURITY.md](SECURITY.md).
+Gunakan Issues untuk bug/saran; sertakan versi Saku, OS, dan langkah kejadian. Jangan mengunggah cadangan, kredensial, atau transaksi pribadi ke laporan publik. Laporan kerentanan mengikuti [SECURITY.md](SECURITY.md).
 
 Copyright © 2026 by **Velora Studio Dev**.

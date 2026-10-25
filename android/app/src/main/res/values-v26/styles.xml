@@ -1,0 +1,5 @@
+<resources>
+    <style name="AppTheme.NoActionBar" parent="AppTheme.SakuBase">
+        <item name="android:navigationBarColor">@android:color/white</item>
+    </style>
+</resources>

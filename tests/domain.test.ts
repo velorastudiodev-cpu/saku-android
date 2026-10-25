@@ -20,9 +20,11 @@ const wallet = (): Wallet => ({
   ...emptyWallet(),
   name: "Dira",
   opening: 100000,
+  accounts: [{ id: "main", name: "Dompet utama", opening: 100000 }],
   transactions: [
     {
       id: "in",
+      accountId: "main",
       kind: "income",
       amount: 1000000,
       category: "Uang jajan",
@@ -31,6 +33,7 @@ const wallet = (): Wallet => ({
     },
     {
       id: "out",
+      accountId: "main",
       kind: "expense",
       amount: 250000,
       category: "Belanja",
@@ -161,7 +164,7 @@ test("backup restore validates all fields, IDs, dates and safe aggregate integer
     null,
     [],
     {},
-    { ...wallet(), version: 2 },
+    { ...wallet(), version: 999 },
     { ...wallet(), name: "" },
     { ...wallet(), budget: -1 },
     { ...wallet(), opening: Infinity },

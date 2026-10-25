@@ -9,10 +9,11 @@ const SecureWallet = registerPlugin<{
   write(options: { value: string }): Promise<void>;
   clearLegacy(): Promise<void>;
 }>("SecureWallet");
-const isAndroid = () => Capacitor.getPlatform() === "android";
+const hasSecureStorage = () =>
+  ["android", "ios"].includes(Capacitor.getPlatform());
 
 export async function loadWallet(): Promise<Wallet | null> {
-  if (isAndroid()) {
+  if (hasSecureStorage()) {
     const stored = await SecureWallet.read();
     const value = stored.value ?? (await Preferences.get({ key })).value;
     if (value === null) return null;
@@ -34,7 +35,7 @@ export async function loadWallet(): Promise<Wallet | null> {
 }
 export async function saveWallet(wallet: Wallet) {
   const value = JSON.stringify(validateWallet(wallet));
-  if (isAndroid()) {
+  if (hasSecureStorage()) {
     await SecureWallet.write({ value });
     await SecureWallet.clearLegacy();
   } else {

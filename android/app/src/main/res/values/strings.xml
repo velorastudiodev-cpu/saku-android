@@ -4,4 +4,5 @@
     <string name="title_activity_main">Saku</string>
     <string name="package_name">com.velorastudio.saku</string>
     <string name="custom_url_scheme">com.velorastudio.saku</string>
+    <string name="widget_description">Saldo tersedia, sisa anggaran, dan pintasan mencatat transaksi.</string>
 </resources>

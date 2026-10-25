@@ -27,3 +27,7 @@ Saat mengaktifkan Play App Signing, rencanakan penggunaan kunci aplikasi Saku ya
 Build TypeScript/Vite dan Gradle APK/AAB berhasil. Pemeriksaan statis APK memastikan izin `INTERNET`/`ACCESS_NETWORK_STATE` tidak ada; izin signature internal AndroidX tetap ada untuk receiver privat. Tanda tangan APK/AAB valid secara kriptografis dan sertifikat APK cocok dengan 1.2.0. Sertifikat Android yang ditandatangani sendiri bukan pengesahan oleh Google. Tidak ada aplikasi yang dijalankan atau screenshot yang diambil pada tahap ini.
 
 Belum dilakukan: publikasi repositori, pendaftaran/verifikasi developer, pengajuan atau review Google Play/Play Protect, audit independen, serta pengujian langsung atau screenshot. Klaim publik harus mengikuti kondisi tersebut. Tidak ada jaminan keamanan absolut atau jaminan lolos review Google.
+
+## Status 1.5.0
+
+Repositori Saku publik atas permintaan pemilik. Tahap 1.3–1.5 digabung menjadi rilis 1.5.0, versionCode 5: kategori custom, jadwal, Undo, cadangan berpassword, multi-dompet, anggaran kategori, widget Android, kunci aplikasi, Boleh Jajan, dan insight offline. Logo baru berasal dari gambar pemilik. Proyek iOS tersedia, tetapi bukan IPA siap pasang dan belum dikonfirmasi melalui Xcode/iPhone. Ketentuan Google/Apple serta batas pemeriksaan di atas tetap berlaku; lihat [catatan 1.5](RELEASE-1.5.md).

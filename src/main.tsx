@@ -5,6 +5,7 @@ import "@fontsource/geist/latin-500.css";
 import "@fontsource/geist/latin-700.css";
 import "./style.css";
 import { App } from "./App";
+import { PrivacyGate } from "./Privacy";
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { failed: boolean }
@@ -29,6 +30,8 @@ class ErrorBoundary extends React.Component<
 }
 createRoot(document.getElementById("root")!).render(
   <ErrorBoundary>
-    <App />
+    <PrivacyGate>
+      <App />
+    </PrivacyGate>
   </ErrorBoundary>,
 );

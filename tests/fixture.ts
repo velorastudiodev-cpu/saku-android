@@ -12,10 +12,12 @@ export function fixture(): Wallet {
     ...emptyWallet(),
     name: "Dira",
     opening: 350000,
+    accounts: [{ id: "main", name: "Dompet utama", opening: 350000 }],
     budget: 1500000,
     transactions: [
       {
         id: "a",
+        accountId: "main",
         kind: "expense",
         category: "Makan & minum",
         amount: 35000,
@@ -24,6 +26,7 @@ export function fixture(): Wallet {
       },
       {
         id: "b",
+        accountId: "main",
         kind: "expense",
         category: "Transportasi",
         amount: 18000,
@@ -32,6 +35,7 @@ export function fixture(): Wallet {
       },
       {
         id: "c",
+        accountId: "main",
         kind: "income",
         category: "Freelance",
         amount: 450000,
@@ -40,6 +44,7 @@ export function fixture(): Wallet {
       },
       {
         id: "d",
+        accountId: "main",
         kind: "expense",
         category: "Makan & minum",
         amount: 42000,
@@ -48,6 +53,7 @@ export function fixture(): Wallet {
       },
       {
         id: "e",
+        accountId: "main",
         kind: "expense",
         category: "Belanja",
         amount: 185000,
@@ -56,6 +62,7 @@ export function fixture(): Wallet {
       },
       {
         id: "f",
+        accountId: "main",
         kind: "expense",
         category: "Transportasi",
         amount: 24000,
@@ -64,6 +71,7 @@ export function fixture(): Wallet {
       },
       {
         id: "g",
+        accountId: "main",
         kind: "expense",
         category: "Hiburan",
         amount: 65000,
@@ -72,6 +80,7 @@ export function fixture(): Wallet {
       },
       {
         id: "h",
+        accountId: "main",
         kind: "income",
         category: "Uang jajan",
         amount: 1500000,
@@ -80,6 +89,7 @@ export function fixture(): Wallet {
       },
       {
         id: "i",
+        accountId: "main",
         kind: "expense",
         category: "Tagihan",
         amount: 99000,

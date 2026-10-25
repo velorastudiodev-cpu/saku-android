@@ -1633,3 +1633,377 @@ dialog::backdrop {
 .goals-grid + .privacy-line {
   font-size: 13px;
 }
+
+/* Saku 1.3: compact daily overview and quiet feedback, same ledger palette. */
+.compact-value {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 8px 0 14px;
+}
+.home-overview {
+  margin-bottom: 16px;
+  align-items: start;
+}
+.home-overview > .panel {
+  min-height: 0;
+}
+.insight-preview {
+  margin-bottom: 16px;
+}
+.insight-preview > .money-advice {
+  margin: 0;
+  border: 0;
+  padding: 16px 0 0;
+}
+.insight-preview > summary,
+.recurring-panel > summary {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  min-height: 44px;
+  font-weight: 500;
+}
+.insight-preview > summary::after,
+.recurring-panel > summary::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: rotate(45deg);
+  flex-shrink: 0;
+  margin: 0 4px 4px;
+}
+.insight-preview[open] > summary::after,
+.recurring-panel[open] > summary::after {
+  transform: rotate(225deg);
+  margin-top: 6px;
+}
+.insight-preview summary > .muted,
+.recurring-panel summary > .muted {
+  font-size: 12px;
+  font-weight: 400;
+  margin-left: auto;
+}
+.due-banner {
+  width: 100%;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.recurring-panel {
+  margin-bottom: 16px;
+}
+.recurring-panel > .hint {
+  margin-top: 8px;
+}
+.recurring-list,
+.category-manage-list {
+  list-style: none;
+  margin: 16px 0;
+  padding: 0;
+}
+.recurring-list > li,
+.category-manage-list > li {
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.recurring-list > li > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+.recurring-list > li > .hint {
+  margin-top: 4px;
+}
+.category-manage-list > li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.category-manage-list small {
+  display: block;
+}
+.feature-panel h2 {
+  margin-bottom: 8px;
+}
+.feature-panel > form,
+.recurring-form {
+  margin-top: 20px;
+}
+.feature-panel .hint {
+  font-size: 13px;
+}
+.recurring-form h3 {
+  font-size: 16px;
+  font-weight: 500;
+  margin: 0;
+}
+.feature-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+.reminder-setting {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  margin-top: 20px;
+}
+.reminder-setting .hint {
+  margin-top: 10px;
+}
+.check-label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+.check-label input {
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+}
+.bulk-category {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  margin-top: 20px;
+}
+.bulk-category summary {
+  cursor: pointer;
+  padding: 10px 0;
+}
+.bulk-category > form {
+  margin-top: 16px;
+}
+.goal-progress {
+  height: 6px;
+  background: var(--border);
+  overflow: hidden;
+  border-radius: 3px;
+  margin: 14px 0;
+}
+.goal-progress > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--text);
+  transform-origin: left;
+  transition: transform 220ms ease-out;
+}
+.goal-milestone {
+  display: block;
+  color: var(--positive);
+  font-size: 12px;
+  margin-bottom: 8px;
+  animation: saku-feedback 180ms ease-out;
+}
+.success-check {
+  animation: saku-feedback 180ms ease-out;
+  flex-shrink: 0;
+}
+.toast {
+  max-width: min(520px, calc(100vw - 32px));
+}
+.toast > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.toast > button {
+  border-color: currentColor;
+  background: transparent;
+  color: inherit;
+  flex-shrink: 0;
+  min-height: 44px;
+}
+.chart-bar {
+  transform-box: view-box;
+  animation: saku-chart 180ms ease-out both;
+}
+@keyframes saku-feedback {
+  from {
+    opacity: 0.7;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes saku-chart {
+  from {
+    transform: scaleY(0.85);
+    opacity: 0.7;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+@media (max-width: 640px) {
+  .recurring-panel > summary {
+    flex-wrap: wrap;
+  }
+  .recurring-panel summary > .muted {
+    margin-left: 0;
+  }
+  .daily-pocket {
+    padding: 18px 20px;
+  }
+  .daily-pocket > strong {
+    font-size: 26px;
+  }
+  .daily-pocket > p {
+    font-size: 12px;
+  }
+  .balance-main {
+    padding: 22px 20px;
+  }
+  .balance-value {
+    font-size: 34px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+.saku-mark {
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.feature-panel > summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+}
+.feature-panel > summary .muted {
+  font-size: 13px;
+  font-weight: 400;
+}
+.account-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.account-row > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.account-row strong {
+  font-weight: 500;
+}
+.account-row small {
+  color: var(--muted);
+}
+.account-row .num {
+  font-size: 18px;
+}
+.account-filter {
+  margin: 12px 0;
+  max-width: 320px;
+}
+.budget-item {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.budget-item .key-value {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.budget-item progress {
+  margin: 10px 0 0;
+}
+.transfer-history {
+  margin-top: 20px;
+}
+.transfer-history > summary {
+  padding: 10px 0;
+  cursor: pointer;
+}
+.spending-guide {
+  justify-content: flex-start;
+  min-width: 0;
+}
+.spending-guide h2 {
+  font-size: 17px;
+  margin: 0 0 8px;
+}
+.spending-guide details > summary {
+  cursor: pointer;
+  padding: 8px 0;
+  font-weight: 500;
+}
+.spending-guide label {
+  margin-top: 14px;
+}
+.spending-guide .key-value {
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 13px;
+}
+.simulation-result {
+  padding: 12px;
+  background: var(--ground);
+  border-radius: var(--radius);
+}
+.smart-insights article {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.smart-insights h3 {
+  font-size: 16px;
+  font-weight: 500;
+  margin: 0 0 6px;
+}
+.smart-insights p {
+  margin: 0;
+}
+.smart-insights > .hint {
+  padding-top: 12px;
+}
+.privacy-error {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 96px;
+  z-index: 60;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+.lock-screen {
+  padding: max(40px, env(safe-area-inset-top)) 24px;
+}
+.notice > p {
+  margin: 4px 0;
+}
+@media (max-width: 640px) {
+  .feature-panel > summary {
+    flex-wrap: wrap;
+  }
+  .spending-guide {
+    padding: 20px;
+  }
+  .account-row > button {
+    flex-shrink: 0;
+  }
+}

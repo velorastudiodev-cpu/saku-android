@@ -87,11 +87,9 @@ test("goal creation, allocation, insufficient funds and deletion preserve total 
   await page.getByLabel("Nama tujuan").fill("Laptop");
   await page.locator("input[name=amount]").fill("10000000");
   await page.getByRole("button", { name: "Simpan tujuan" }).click();
-  const card = page
-    .locator("section")
-    .filter({
-      has: page.getByRole("heading", { name: "Laptop", exact: true }),
-    });
+  const card = page.locator("section").filter({
+    has: page.getByRole("heading", { name: "Laptop", exact: true }),
+  });
   await card
     .getByRole("button", { name: "Sisihkan uang", exact: true })
     .click();
@@ -135,29 +133,32 @@ test("backup rejects corrupt content, exports and restores valid data", async ({
 }) => {
   await seeded(page);
   await page.getByRole("link", { name: "Pengaturan", exact: true }).click();
-  await page
-    .getByLabel("Pilih cadangan JSON")
-    .setInputFiles({
-      name: "bad.json",
-      mimeType: "application/json",
-      buffer: Buffer.from('{"version":1}'),
-    });
+  await page.getByLabel("Pilih cadangan JSON").setInputFiles({
+    name: "bad.json",
+    mimeType: "application/json",
+    buffer: Buffer.from('{"version":1}'),
+  });
   await expect(page.getByRole("alert")).toBeVisible();
   const w = { ...fixture(), name: "Rani" };
-  await page
-    .getByLabel("Pilih cadangan JSON")
-    .setInputFiles({
-      name: "saku.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(JSON.stringify(w)),
-    });
+  await page.getByLabel("Pilih cadangan JSON").setInputFiles({
+    name: "saku.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(w)),
+  });
   await expect(page.getByRole("dialog")).toContainText("Rani");
   await page
     .getByRole("button", { name: "Pulihkan data", exact: true })
     .click();
   await expect(page.getByLabel("Nama panggilan")).toHaveValue("Rani");
   const pending = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Ekspor cadangan JSON" }).click();
+  await page
+    .getByRole("button", { name: "Ekspor cadangan berpassword" })
+    .click();
+  await page
+    .getByLabel("Kata sandi", { exact: true })
+    .fill("contoh-kata-sandi");
+  await page.getByLabel("Ulangi kata sandi").fill("contoh-kata-sandi");
+  await page.getByRole("button", { name: "Enkripsi & ekspor" }).click();
   const download = await pending;
   expect(download.suggestedFilename()).toMatch(/\.json$/);
 });
@@ -179,13 +180,11 @@ test("corrupt local storage is not overwritten and can be recovered via import",
   await expect(
     page.getByRole("heading", { name: "Catatan belum bisa dibuka" }),
   ).toBeVisible();
-  await page
-    .getByLabel("Pilih cadangan JSON")
-    .setInputFiles({
-      name: "saku.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(JSON.stringify(fixture())),
-    });
+  await page.getByLabel("Pilih cadangan JSON").setInputFiles({
+    name: "saku.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(fixture())),
+  });
   await page
     .getByRole("button", { name: "Pulihkan data", exact: true })
     .click();

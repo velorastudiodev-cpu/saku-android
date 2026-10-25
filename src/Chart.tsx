@@ -75,6 +75,11 @@ export function CashChart({
               return (
                 <rect
                   key={kind}
+                  className="chart-bar"
+                  style={{
+                    transformOrigin: `0px ${bottom}px`,
+                    animationDelay: `${Math.min(i * 4, 40)}ms`,
+                  }}
                   x={left + bin * (i + 0.5) + (k ? 1 : -bar - 1)}
                   y={bottom - h}
                   width={bar}

@@ -10,6 +10,7 @@ import {
 } from "react";
 import { App as NativeApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
+import { LocalNotifications } from "@capacitor/local-notifications";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -37,7 +38,8 @@ import {
   addDays,
   balances,
   breakdown,
-  categories,
+  categoryNames,
+  processRecurring,
   csv,
   dateLabel,
   emptyWallet,
@@ -59,9 +61,30 @@ import {
 import { exportFile, loadWallet, saveWallet } from "./storage";
 import { CashChart } from "./Chart";
 import { MoneyAdvice } from "./MoneyAdvice";
+import { AnimatedMoney, GoalProgress } from "./Motion";
+import { ManageCategories, BulkCategory } from "./ManageCategories";
+import { RecurringPanel } from "./RecurringPanel";
+import {
+  AccountsPanel,
+  AccountSelect,
+  CategoryBudgets,
+  BudgetAlerts,
+  SpendingGuide,
+  SmartInsights,
+} from "./MoneyManagement";
+import { PrivacySettings, publishWidget } from "./Privacy";
+import { syncReminders } from "./reminders";
+import {
+  protectBackup,
+  unlockBackup,
+  validateProtectedBackup,
+  type ProtectedBackup,
+} from "./backup";
 
 type Page = "home" | "transactions" | "reports" | "goals" | "settings";
 type Modal =
+  | { kind: "backup-export" }
+  | { kind: "backup-import"; backup: ProtectedBackup }
   | { kind: "transaction"; transaction?: Transaction }
   | { kind: "goal"; goal?: Goal }
   | { kind: "allocate"; goal: Goal }
@@ -81,19 +104,18 @@ const pages = [
 ] as const;
 const readPage = (): Page =>
   pages.find((p) => p.id === location.hash.slice(1))?.id ?? "home";
+let launchUrlConsumed = false;
 const formText = (form: HTMLFormElement, key: string) =>
   String(new FormData(form).get(key) ?? "").trim();
 function Mark() {
   return (
-    <svg viewBox="0 0 32 36" width="28" height="30" aria-hidden="true">
-      <path
-        d="M3 3h26v23L16 33 3 26V3zm6 0v10h14V3M9 20l7 4 7-4"
-        stroke="currentColor"
-        strokeWidth="2"
-        fill="none"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <img
+      src="/saku-logo.png"
+      width="36"
+      height="36"
+      alt=""
+      className="saku-mark"
+    />
   );
 }
 function Empty({
@@ -228,18 +250,24 @@ export function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [undo, setUndo] = useState<Wallet | null>(null);
+  const [savedPulse, setSavedPulse] = useState(false);
+  const [reminderError, setReminderError] = useState("");
+  const autoAttempt = useRef<{ wallet: Wallet; date: string } | null>(null);
   const saving = useRef(false);
   const [period, setPeriod] = useState<Period>("month");
   const [offset, setOffset] = useState(0);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | Kind>("all");
   const [txMonth, setTxMonth] = useState("");
+  const [accountFilter, setAccountFilter] = useState("");
+  const [quickAdd, setQuickAdd] = useState(false);
   const [limit, setLimit] = useState(40);
   const [txKind, setTxKind] = useState<Kind>("expense");
   const [withdrawing, setWithdrawing] = useState(false);
   const [categoryKind, setCategoryKind] = useState<Kind>("expense");
   const importRef = useRef<HTMLInputElement>(null);
-  const [, setCurrentDate] = useState(today);
+  const [currentDate, setCurrentDate] = useState(today);
   useEffect(() => {
     const refresh = () => setCurrentDate(today());
     const timer = setInterval(refresh, 60000);
@@ -270,7 +298,7 @@ export function App() {
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
+    if (Capacitor.getPlatform() !== "android") return;
     const listener = NativeApp.addListener("backButton", () => {
       if (modal) setModal(null);
       else if (page !== "home") location.hash = "home";
@@ -282,9 +310,118 @@ export function App() {
   }, [modal, page]);
   useEffect(() => {
     if (!notice) return;
-    const id = setTimeout(() => setNotice(""), 4000);
+    const id = setTimeout(() => {
+      setNotice("");
+      setUndo(null);
+    }, 10000);
     return () => clearTimeout(id);
-  }, [notice]);
+  }, [notice, wallet]);
+  useEffect(() => {
+    if (!savedPulse) return;
+    const timer = setTimeout(() => setSavedPulse(false), 1200);
+    return () => clearTimeout(timer);
+  }, [savedPulse, wallet]);
+  useEffect(() => {
+    if (!wallet) return;
+    void publishWidget(wallet).catch(() =>
+      setNotice(
+        "Catatan tersimpan; widget belum diperbarui. Buka ulang Saku untuk mencoba lagi.",
+      ),
+    );
+  }, [wallet, currentDate]);
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const route = (url?: string) => {
+      if (url === "saku://transaction") {
+        location.hash = "transactions";
+        setQuickAdd(true);
+      } else if (url === "saku://home") location.hash = "home";
+    };
+    if (!launchUrlConsumed) {
+      launchUrlConsumed = true;
+      void NativeApp.getLaunchUrl().then((result) => route(result?.url));
+    }
+    const listener = NativeApp.addListener("appUrlOpen", ({ url }) =>
+      route(url),
+    );
+    return () => {
+      void listener.then((l) => l.remove());
+    };
+  }, []);
+  useEffect(() => {
+    if (quickAdd && wallet && !busy && !modal) {
+      setQuickAdd(false);
+      open({ kind: "transaction" });
+    }
+  }, [quickAdd, wallet, busy, modal]);
+  useEffect(() => {
+    if (!wallet) return;
+    let current = true;
+    void syncReminders(wallet)
+      .then(() => {
+        if (current) setReminderError("");
+      })
+      .catch((e) => {
+        if (current)
+          setReminderError(
+            e instanceof Error ? e.message : "Pengingat belum diperbarui.",
+          );
+      });
+    return () => {
+      current = false;
+    };
+  }, [wallet]);
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const listener = LocalNotifications.addListener(
+      "localNotificationActionPerformed",
+      () => {
+        location.hash = "transactions";
+      },
+    );
+    return () => {
+      void listener.then((l) => l.remove());
+    };
+  }, []);
+  useEffect(() => {
+    if (
+      !wallet ||
+      modal ||
+      busy ||
+      saving.current ||
+      (autoAttempt.current?.wallet === wallet &&
+        autoAttempt.current.date === currentDate)
+    )
+      return;
+    autoAttempt.current = { wallet, date: currentDate };
+    try {
+      const result = processRecurring(wallet, currentDate);
+      if (result.wallet === wallet) return;
+      saving.current = true;
+      setBusy(true);
+      void saveWallet(result.wallet)
+        .then(() => {
+          setWallet(result.wallet);
+          setUndo(null);
+          setNotice(
+            result.count
+              ? `${result.count} transaksi rutin dicatat otomatis.`
+              : "Jadwal diperbarui tanpa menggandakan transaksi.",
+          );
+        })
+        .catch((e) =>
+          setError(
+            e instanceof Error ? e.message : "Transaksi rutin belum tersimpan.",
+          ),
+        )
+        .finally(() => {
+          saving.current = false;
+          setBusy(false);
+        });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Jadwal belum bisa diproses.");
+    }
+  }, [wallet, currentDate, busy, modal]);
   useEffect(() => {
     const from = pages.findIndex((p) => p.id === previousPage.current);
     const to = pages.findIndex((p) => p.id === page);
@@ -386,22 +523,27 @@ export function App() {
       setError("");
     }
   }
-  async function commit(next: Wallet, message: string) {
-    await saveWallet(next);
-    setWallet(next);
+  async function commit(next: Wallet, message: string, undoable = false) {
+    const validated = validateWallet(next);
+    await saveWallet(validated);
+    setUndo(undoable ? wallet : null);
+    setWallet(validated);
+    if (message === "Transaksi tersimpan.") setSavedPulse(true);
     setLoadError(false);
     setModal(null);
     setNotice(message);
   }
   async function run(action: () => Promise<void>) {
-    if (saving.current) return;
+    if (saving.current) return false;
     saving.current = true;
     setBusy(true);
     setError("");
     try {
       await action();
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Gagal menyimpan. Coba lagi.");
+      return false;
     } finally {
       saving.current = false;
       setBusy(false);
@@ -417,24 +559,111 @@ export function App() {
   async function importBackup(file?: File) {
     if (!file) return;
     await run(async () => {
-      if (file.size > 10 * 1024 * 1024)
-        throw new Error("File terlalu besar. Maksimal 10 MB.");
+      if (file.size > 16 * 1024 * 1024)
+        throw new Error(
+          "File terlalu besar. Maksimal 16 MB untuk cadangan terenkripsi.",
+        );
       let parsed: unknown;
       try {
         parsed = JSON.parse(await file.text());
       } catch {
         throw new Error("Pilih cadangan JSON yang diekspor dari Saku.");
       }
-      const next = validateWallet(parsed);
-      open({
-        kind: "confirm",
-        title: "Pulihkan cadangan?",
-        message: `${next.transactions.length} transaksi dan ${next.goals.length} tujuan milik ${next.name} akan mengganti data di perangkat ini. Ekspor data lama terlebih dahulu jika masih diperlukan.`,
-        label: "Pulihkan data",
-        action: () => commit(next, "Cadangan berhasil dipulihkan."),
-      });
+      if (parsed && typeof parsed === "object" && "format" in parsed) {
+        open({
+          kind: "backup-import",
+          backup: validateProtectedBackup(parsed),
+        });
+      } else {
+        if (file.size > 10 * 1024 * 1024)
+          throw new Error("Cadangan biasa maksimal 10 MB.");
+        confirmImport(validateWallet(parsed));
+      }
     });
   }
+  function confirmImport(next: Wallet) {
+    open({
+      kind: "confirm",
+      title: "Pulihkan cadangan?",
+      message: `${next.transactions.length} transaksi, ${next.goals.length} tujuan, dan ${next.recurring.length} jadwal milik ${next.name} akan mengganti data di perangkat ini. Ekspor data lama terlebih dahulu jika masih diperlukan. Jadwal otomatis yang lewat akan diproses setelah pemulihan.`,
+      label: "Pulihkan data",
+      action: () => commit(next, "Cadangan berhasil dipulihkan."),
+    });
+  }
+  const backupDialog = (modal?.kind === "backup-export" ||
+    modal?.kind === "backup-import") && (
+    <Dialog
+      title={
+        modal.kind === "backup-export"
+          ? "Cadangan berpassword"
+          : "Buka cadangan"
+      }
+      close={close}
+    >
+      <p className="dialog-copy">
+        {modal.kind === "backup-export"
+          ? "Simpan kata sandi secara terpisah. Saku tidak dapat memulihkan kata sandi yang hilang."
+          : "Masukkan kata sandi cadangan. Data baru diganti setelah Anda mengonfirmasi pemulihan."}
+      </p>
+      <form
+        onSubmit={onSubmit(async (form) => {
+          const password = String(new FormData(form).get("password") || "");
+          if (modal.kind === "backup-export" && wallet) {
+            if (password !== String(new FormData(form).get("repeat") || ""))
+              throw new Error("Kedua kata sandi belum sama.");
+            const data = await protectBackup(wallet, password);
+            await exportFile(`saku-cadangan-aman-${today()}.json`, data);
+            setModal(null);
+            setNotice("Cadangan terenkripsi siap disimpan.");
+          } else if (modal.kind === "backup-import")
+            confirmImport(await unlockBackup(modal.backup, password));
+        })}
+      >
+        <label>
+          Kata sandi
+          <input
+            name="password"
+            type="password"
+            autoComplete={
+              modal.kind === "backup-export"
+                ? "new-password"
+                : "current-password"
+            }
+            minLength={modal.kind === "backup-export" ? 10 : 1}
+            maxLength={1024}
+            required
+            autoCapitalize="none"
+          />
+        </label>
+        {modal.kind === "backup-export" && (
+          <label>
+            Ulangi kata sandi
+            <input
+              name="repeat"
+              type="password"
+              autoComplete="new-password"
+              minLength={10}
+              maxLength={1024}
+              required
+              autoCapitalize="none"
+            />
+          </label>
+        )}
+        {error && (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
+        <button className="primary" disabled={busy}>
+          {busy
+            ? "Memproses…"
+            : modal.kind === "backup-export"
+              ? "Enkripsi & ekspor"
+              : "Buka cadangan"}
+        </button>
+      </form>
+    </Dialog>
+  );
   const hiddenImport = (
     <input
       ref={importRef}
@@ -457,8 +686,18 @@ export function App() {
       )}
       {notice && (
         <div className="toast" role="status">
-          <Check size={17} />
-          {notice}
+          <Check className="success-check" size={17} />
+          <span>{notice}</span>
+          {undo && (
+            <button
+              disabled={busy}
+              onClick={() =>
+                void run(() => commit(undo, "Perubahan diurungkan."))
+              }
+            >
+              Urungkan
+            </button>
+          )}
         </div>
       )}
     </>
@@ -511,6 +750,7 @@ export function App() {
         {hiddenImport}
         {status}
         {confirmation}
+        {backupDialog}
       </main>
     );
   if (!wallet)
@@ -537,6 +777,13 @@ export function App() {
                 ...emptyWallet(),
                 name: formText(f, "name"),
                 opening: parseAmount(formText(f, "opening"), true),
+                accounts: [
+                  {
+                    id: "main",
+                    name: "Dompet utama",
+                    opening: parseAmount(formText(f, "opening"), true),
+                  },
+                ],
                 budget: parseAmount(formText(f, "budget"), true),
               },
               "Saku siap digunakan.",
@@ -588,14 +835,13 @@ export function App() {
         </p>
         {hiddenImport}
         {confirmation}
+        {backupDialog}
       </main>
     );
 
   const balance = balances(wallet);
   const monthRange = periodRange("month");
   const month = totals(inRange(wallet.transactions, monthRange));
-  const day = totals(wallet.transactions.filter((t) => t.date === today()));
-  const weekRange = periodRange("week");
   const range = periodRange(period, offset);
   const scoped = inRange(wallet.transactions, range);
   const report = totals(scoped);
@@ -609,21 +855,12 @@ export function App() {
     (t) =>
       (filter === "all" || t.kind === filter) &&
       (!txMonth || t.date.startsWith(txMonth)) &&
+      (!accountFilter || t.accountId === accountFilter) &&
       `${t.note} ${t.category}`
         .toLocaleLowerCase("id")
         .includes(query.toLocaleLowerCase("id")),
   );
   const budgetLeft = Math.max(0, wallet.budget - month.expense);
-  const daysLeft =
-    Number(monthRange.end.slice(8)) - Number(today().slice(8)) + 1;
-  const safeDaily = Math.floor(
-    Math.max(
-      0,
-      wallet.budget
-        ? Math.min(balance.available, budgetLeft)
-        : balance.available,
-    ) / daysLeft,
-  );
   const reserveShare =
     balance.balance > 0
       ? Math.min(100, (balance.reserved / balance.balance) * 100)
@@ -647,7 +884,9 @@ export function App() {
           <span className="transaction-text">
             <span>{t.note || t.category}</span>
             <small>
-              {t.category} · {dateLabel(t.date, true)}
+              {t.category} ·{" "}
+              {wallet.accounts.find((a) => a.id === t.accountId)?.name} ·{" "}
+              {dateLabel(t.date, true)}
             </small>
           </span>
           <span
@@ -661,9 +900,17 @@ export function App() {
     </div>
   );
   const addTransaction = (
-    <button className="primary" onClick={() => open({ kind: "transaction" })}>
-      <Plus size={18} />
-      <span>Catat transaksi</span>
+    <button
+      className="primary"
+      aria-label="Catat transaksi"
+      onClick={() => open({ kind: "transaction" })}
+    >
+      {savedPulse ? (
+        <Check className="success-check" size={18} />
+      ) : (
+        <Plus size={18} />
+      )}
+      <span>{savedPulse ? "Tersimpan" : "Catat transaksi"}</span>
     </button>
   );
   const goalPreview = (g: Goal) => {
@@ -674,10 +921,10 @@ export function App() {
           <span>{g.name}</span>
           <span className="num">{pct(p.progress)}</span>
         </div>
-        <progress
+        <GoalProgress
           value={g.saved}
           max={g.target}
-          aria-label={`Progres ${g.name}`}
+          label={`Progres ${g.name}`}
         />
         <div>
           <small>{money(g.saved)}</small>
@@ -783,6 +1030,9 @@ export function App() {
               kurangi alokasi tujuan.
             </div>
           )}
+          {(page === "home" || page === "transactions") && (
+            <BudgetAlerts wallet={wallet} />
+          )}
           {page === "home" && (
             <>
               <section className="balance-panel panel">
@@ -792,7 +1042,7 @@ export function App() {
                     className="balance-value num"
                     data-testid="available-balance"
                   >
-                    {money(balance.available)}
+                    <AnimatedMoney value={balance.available} />
                   </div>
                   <p className="balance-caption">
                     Uang yang bisa dipakai, setelah alokasi tujuan.
@@ -816,116 +1066,80 @@ export function App() {
                     </span>
                   </div>
                 </div>
-                <div className="daily-pocket">
-                  <span className="muted">Ruang jajan hari ini</span>
-                  <strong className="num">{money(safeDaily)}</strong>
-                  <p>
-                    {wallet.budget
-                      ? "Sisa anggaran dan saldo tersedia"
-                      : "Saldo tersedia"}{" "}
-                    dibagi {daysLeft} hari tersisa bulan ini.
-                  </p>
-                  <div className="today-spent">
-                    <span>Sudah keluar hari ini</span>
-                    <span className="num">{money(day.expense)}</span>
-                  </div>
-                </div>
+                <SpendingGuide wallet={wallet} />
               </section>
-              <MoneyAdvice wallet={wallet} />
-              <div className="overview-grid">
+              {wallet.recurring.some(
+                (r) => r.active && r.nextDate <= today(),
+              ) && (
+                <button
+                  className="due-banner"
+                  onClick={() => navigate("transactions")}
+                >
+                  Ada jadwal jatuh tempo <ArrowRight size={16} />
+                </button>
+              )}
+              <div className="overview-grid home-overview">
                 <Section
-                  title="Arus kas minggu ini"
+                  title="Bulan ini"
                   action={
                     <button
                       className="text-button"
                       onClick={() => {
-                        setPeriod("week");
+                        setPeriod("month");
                         setOffset(0);
                         navigate("reports");
                       }}
                     >
-                      Laporan
-                      <ArrowUpRight size={16} />
+                      Lihat detail <ArrowRight size={16} />
                     </button>
                   }
                 >
-                  <div className="flow-stats">
-                    <div>
-                      <span>Pemasukan</span>
-                      <strong className="num">
-                        {money(
-                          totals(inRange(wallet.transactions, weekRange))
-                            .income,
-                        )}
-                      </strong>
-                    </div>
-                    <div>
-                      <span>Pengeluaran</span>
-                      <strong className="num">
-                        {money(
-                          totals(inRange(wallet.transactions, weekRange))
-                            .expense,
-                        )}
-                      </strong>
-                    </div>
-                  </div>
-                  <CashChart
-                    transactions={wallet.transactions}
-                    start={weekRange.start}
-                    end={weekRange.end}
-                  />
-                </Section>
-                <Section title="Rencana bulan ini" className="month-plan">
-                  <p className="muted">{monthRange.label}</p>
-                  <div className="budget-value num">
-                    {money(month.expense)}
-                    <span>
-                      {" "}
-                      / {wallet.budget ? money(wallet.budget) : "belum diatur"}
-                    </span>
+                  <p className="muted">
+                    {wallet.budget ? "Sisa anggaran" : "Pengeluaran tercatat"}
+                  </p>
+                  <div className="compact-value num">
+                    {money(wallet.budget ? budgetLeft : month.expense)}
                   </div>
                   {wallet.budget > 0 ? (
                     <>
                       <progress
-                        className={month.expense > wallet.budget ? "over" : ""}
                         max={wallet.budget}
                         value={Math.min(month.expense, wallet.budget)}
+                        className={month.expense >= wallet.budget ? "over" : ""}
                         aria-label="Anggaran terpakai"
                       />
                       <p
                         className={
-                          month.expense > wallet.budget ? "negative" : "muted"
+                          month.expense >= wallet.budget ? "negative" : "hint"
                         }
                       >
                         {month.expense > wallet.budget
-                          ? `Melewati anggaran ${money(month.expense - wallet.budget)}.`
-                          : `${pct((month.expense / wallet.budget) * 100)} terpakai · tersisa ${money(budgetLeft)}`}
+                          ? `Melewati batas ${money(month.expense - wallet.budget)}.`
+                          : month.expense === wallet.budget
+                            ? "Anggaran bulan ini sudah habis."
+                            : `${money(month.expense)} terpakai dari ${money(wallet.budget)}.`}
                       </p>
                     </>
                   ) : (
-                    <p className="muted">
-                      Tentukan batas pengeluaran untuk menjaga uang jajanmu.
-                    </p>
+                    <button
+                      className="text-button"
+                      onClick={() => navigate("settings")}
+                    >
+                      Atur anggaran bulanan
+                    </button>
                   )}
                   <div className="key-value">
-                    <span>Surplus bulan ini</span>
+                    <span>Arus kas bersih</span>
                     <strong
                       className={`num ${month.net < 0 ? "negative" : ""}`}
                     >
                       {money(month.net)}
                     </strong>
                   </div>
-                  <div className="key-value">
-                    <span>Persentase surplus</span>
-                    <strong className="num">{pct(month.rate)}</strong>
-                  </div>
-                  <button
-                    className="text-button"
-                    onClick={() => navigate("settings")}
-                  >
-                    Atur anggaran
-                    <ArrowRight size={16} />
-                  </button>
+                  <p className="hint">
+                    Pemasukan dikurangi pengeluaran bulan ini. Saldo awal bukan
+                    pemasukan bulan berjalan.
+                  </p>
                 </Section>
                 <Section
                   title="Transaksi terbaru"
@@ -934,13 +1148,12 @@ export function App() {
                       className="text-button"
                       onClick={() => navigate("transactions")}
                     >
-                      Semua
-                      <ArrowRight size={16} />
+                      Semua <ArrowRight size={16} />
                     </button>
                   }
                 >
                   {ordered.length ? (
-                    rows(ordered.slice(0, 4))
+                    rows(ordered.slice(0, 3))
                   ) : (
                     <Empty
                       title="Catatan pertamamu dimulai di sini."
@@ -949,187 +1162,221 @@ export function App() {
                           className="text-button"
                           onClick={() => open({ kind: "transaction" })}
                         >
-                          Tambah transaksi
-                          <Plus size={16} />
+                          Tambah transaksi <Plus size={16} />
                         </button>
                       }
                     >
-                      Masukkan uang jajan yang diterima atau pengeluaran hari
-                      ini.
+                      Masukkan uang yang diterima atau pengeluaran hari ini.
                     </Empty>
                   )}
                 </Section>
+              </div>
+              <details className="panel insight-preview">
+                <summary>
+                  Saku Insight <span className="muted">Lihat saran</span>
+                </summary>
+                <SmartInsights wallet={wallet} />
+                <MoneyAdvice wallet={wallet} />
+              </details>
+              {wallet.goals.length > 0 && (
                 <Section
-                  title="Sedang kamu wujudkan"
+                  title="Tujuan terdekat"
                   action={
                     <button
                       className="text-button"
                       onClick={() => navigate("goals")}
                     >
-                      Tujuan
-                      <ArrowRight size={16} />
+                      Semua tujuan <ArrowRight size={16} />
                     </button>
                   }
                 >
-                  {wallet.goals.length ? (
-                    <>
-                      {wallet.goals.slice(0, 2).map(goalPreview)}
-                      <p className="hint">
-                        Tabungan tetap milikmu, hanya disisihkan dari saldo
-                        tersedia.
-                      </p>
-                    </>
-                  ) : (
-                    <Empty
-                      title="Beri uangmu sebuah tujuan."
-                      action={
-                        <button
-                          className="text-button"
-                          onClick={() => open({ kind: "goal" })}
-                        >
-                          Buat tujuan
-                          <Plus size={16} />
-                        </button>
-                      }
-                    >
-                      Dana darurat, barang impian, atau perjalanan berikutnya.
-                    </Empty>
+                  {goalPreview(
+                    [...wallet.goals].sort((a, b) =>
+                      a.deadline.localeCompare(b.deadline),
+                    )[0],
                   )}
                 </Section>
-              </div>
+              )}
             </>
           )}
           {page === "transactions" && (
-            <Section
-              title="Riwayat uangmu"
-              action={
-                <span className="muted">{filtered.length} transaksi</span>
-              }
-            >
-              <div className="filters">
-                <label className="search-field">
-                  <Search size={18} />
-                  <input
-                    aria-label="Cari transaksi"
-                    value={query}
-                    onChange={(e) => {
-                      setQuery(e.target.value);
-                      setLimit(40);
-                    }}
-                    placeholder="Cari catatan atau kategori"
-                  />
-                </label>
-                <label className="sr-only" htmlFor="tx-month">
-                  Bulan transaksi
-                </label>
-                <select
-                  id="tx-month"
-                  value={txMonth}
-                  onChange={(e) => {
-                    setTxMonth(e.target.value);
-                    setLimit(40);
-                  }}
-                >
-                  <option value="">Semua bulan</option>
-                  {[
-                    ...new Set(
-                      wallet.transactions.map((t) => t.date.slice(0, 7)),
-                    ),
-                  ]
-                    .sort()
-                    .reverse()
-                    .map((m) => (
-                      <option key={m} value={m}>
-                        {periodRange("month", 0, `${m}-01`).label}
-                      </option>
-                    ))}
-                </select>
-              </div>
-              <div className="filter-row">
-                <div className="tabs" role="group" aria-label="Jenis transaksi">
-                  {(["all", "expense", "income"] as const).map((f) => (
-                    <button
-                      key={f}
-                      aria-pressed={filter === f}
-                      onClick={() => {
-                        setFilter(f);
+            <>
+              <AccountsPanel
+                wallet={wallet}
+                busy={busy}
+                save={(next, message) => run(() => commit(next, message, true))}
+              />
+              <RecurringPanel
+                wallet={wallet}
+                busy={busy}
+                save={(next, message) => run(() => commit(next, message, true))}
+              />
+              {reminderError && (
+                <p className="notice" role="status">
+                  {reminderError}
+                </p>
+              )}
+              <Section
+                title="Riwayat uangmu"
+                action={
+                  <span className="muted">{filtered.length} transaksi</span>
+                }
+              >
+                <div className="filters">
+                  <label className="search-field">
+                    <Search size={18} />
+                    <input
+                      aria-label="Cari transaksi"
+                      value={query}
+                      onChange={(e) => {
+                        setQuery(e.target.value);
                         setLimit(40);
                       }}
-                    >
-                      {f === "all"
-                        ? "Semua"
-                        : f === "expense"
-                          ? "Pengeluaran"
-                          : "Pemasukan"}
-                    </button>
-                  ))}
-                </div>
-                {(query || txMonth) && (
-                  <button
-                    className="text-button"
-                    onClick={() => {
-                      setQuery("");
-                      setTxMonth("");
+                      placeholder="Cari catatan atau kategori"
+                    />
+                  </label>
+                  <label className="sr-only" htmlFor="tx-month">
+                    Bulan transaksi
+                  </label>
+                  <select
+                    id="tx-month"
+                    value={txMonth}
+                    onChange={(e) => {
+                      setTxMonth(e.target.value);
+                      setLimit(40);
                     }}
                   >
-                    Reset
+                    <option value="">Semua bulan</option>
+                    {[
+                      ...new Set(
+                        wallet.transactions.map((t) => t.date.slice(0, 7)),
+                      ),
+                    ]
+                      .sort()
+                      .reverse()
+                      .map((m) => (
+                        <option key={m} value={m}>
+                          {periodRange("month", 0, `${m}-01`).label}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <label className="account-filter">
+                  Dompet
+                  <select
+                    value={accountFilter}
+                    onChange={(e) => {
+                      setAccountFilter(e.target.value);
+                      setLimit(40);
+                    }}
+                  >
+                    <option value="">Semua dompet</option>
+                    {wallet.accounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="filter-row">
+                  <div
+                    className="tabs"
+                    role="group"
+                    aria-label="Jenis transaksi"
+                  >
+                    {(["all", "expense", "income"] as const).map((f) => (
+                      <button
+                        key={f}
+                        aria-pressed={filter === f}
+                        onClick={() => {
+                          setFilter(f);
+                          setLimit(40);
+                        }}
+                      >
+                        {f === "all"
+                          ? "Semua"
+                          : f === "expense"
+                            ? "Pengeluaran"
+                            : "Pemasukan"}
+                      </button>
+                    ))}
+                  </div>
+                  {(query || txMonth || accountFilter) && (
+                    <button
+                      className="text-button"
+                      onClick={() => {
+                        setQuery("");
+                        setTxMonth("");
+                        setAccountFilter("");
+                      }}
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+                <div className="transaction-summary">
+                  <span>
+                    Masuk{" "}
+                    <strong className="num">
+                      {money(totals(filtered).income)}
+                    </strong>
+                  </span>
+                  <span>
+                    Keluar{" "}
+                    <strong className="num">
+                      {money(totals(filtered).expense)}
+                    </strong>
+                  </span>
+                </div>
+                {filtered.length ? (
+                  rows(filtered.slice(0, limit))
+                ) : (
+                  <Empty
+                    title={
+                      wallet.transactions.length
+                        ? "Tidak ada transaksi yang cocok."
+                        : "Belum ada transaksi."
+                    }
+                  >
+                    {wallet.transactions.length
+                      ? "Coba kata lain atau ubah filter."
+                      : "Catat pemasukan atau pengeluaran pertamamu."}
+                  </Empty>
+                )}
+                {filtered.length > limit && (
+                  <button className="wide" onClick={() => setLimit(limit + 40)}>
+                    Tampilkan lagi ({limit} dari {filtered.length})
                   </button>
                 )}
-              </div>
-              <div className="transaction-summary">
-                <span>
-                  Masuk{" "}
-                  <strong className="num">
-                    {money(totals(filtered).income)}
-                  </strong>
-                </span>
-                <span>
-                  Keluar{" "}
-                  <strong className="num">
-                    {money(totals(filtered).expense)}
-                  </strong>
-                </span>
-              </div>
-              {filtered.length ? (
-                rows(filtered.slice(0, limit))
-              ) : (
-                <Empty
-                  title={
-                    wallet.transactions.length
-                      ? "Tidak ada transaksi yang cocok."
-                      : "Belum ada transaksi."
+                <div className="list-footer">
+                  <span>Ketuk transaksi untuk mengedit atau menghapus.</span>
+                  <button
+                    className="text-button"
+                    disabled={!filtered.length || busy}
+                    onClick={() =>
+                      void run(() =>
+                        exportFile(
+                          `saku-transaksi-${today()}.csv`,
+                          csv(filtered),
+                          "text/csv",
+                        ),
+                      )
+                    }
+                  >
+                    <Download size={16} />
+                    CSV
+                  </button>
+                </div>
+                <BulkCategory
+                  wallet={wallet}
+                  transactions={filtered}
+                  busy={busy}
+                  save={(next, message) =>
+                    run(() => commit(next, message, true))
                   }
-                >
-                  {wallet.transactions.length
-                    ? "Coba kata lain atau ubah filter."
-                    : "Catat pemasukan atau pengeluaran pertamamu."}
-                </Empty>
-              )}
-              {filtered.length > limit && (
-                <button className="wide" onClick={() => setLimit(limit + 40)}>
-                  Tampilkan lagi ({limit} dari {filtered.length})
-                </button>
-              )}
-              <div className="list-footer">
-                <span>Ketuk transaksi untuk mengedit atau menghapus.</span>
-                <button
-                  className="text-button"
-                  disabled={!filtered.length || busy}
-                  onClick={() =>
-                    void run(() =>
-                      exportFile(
-                        `saku-transaksi-${today()}.csv`,
-                        csv(filtered),
-                        "text/csv",
-                      ),
-                    )
-                  }
-                >
-                  <Download size={16} />
-                  CSV
-                </button>
-              </div>
-            </Section>
+                />
+              </Section>
+            </>
           )}
           {page === "reports" && (
             <>
@@ -1169,7 +1416,7 @@ export function App() {
               </div>
               <section className="report-totals panel">
                 <div>
-                  <span>Surplus bersih</span>
+                  <span>Arus kas bersih</span>
                   <strong
                     className={`num lead ${report.net < 0 ? "negative" : ""}`}
                     data-testid="report-net"
@@ -1177,9 +1424,7 @@ export function App() {
                     {money(report.net)}
                   </strong>
                   <small>
-                    {report.rate === null
-                      ? "Persentase belum tersedia tanpa pemasukan."
-                      : `${pct(report.rate)} dari pemasukan periode ini`}
+                    Pemasukan dikurangi pengeluaran. Saldo awal tidak termasuk.
                   </small>
                 </div>
                 <div>
@@ -1222,10 +1467,21 @@ export function App() {
                     end={range.end}
                   />
                   <p className="chart-note">
-                    {report.income
-                      ? `${pct(report.expenseRate)} dari pemasukan terpakai untuk pengeluaran.`
-                      : "Tambahkan pemasukan untuk menghitung persentase surplus."}
+                    {report.net < 0
+                      ? `Pengeluaran melebihi pemasukan tercatat sebesar ${money(-report.net)}.`
+                      : `Pemasukan tersisa setelah pengeluaran: ${money(report.net)}.`}{" "}
+                    Saldo awal tetap dihitung dalam saldo total, bukan arus kas
+                    periode ini.
                   </p>
+                  <details className="chart-data">
+                    <summary>Rincian persentase</summary>
+                    <p className="hint">
+                      Surplus ÷ pemasukan: {pct(report.rate)}. Pengeluaran ÷
+                      pemasukan: {pct(report.expenseRate)}. Rasio dapat
+                      melampaui 100% ketika pemasukan tercatat kecil; tanda “—”
+                      berarti belum ada pemasukan.
+                    </p>
+                  </details>
                 </Section>
                 <Section title="Dibanding periode lalu">
                   <p className="comparison-period">
@@ -1244,7 +1500,7 @@ export function App() {
                             ? "Pemasukan"
                             : k === "expense"
                               ? "Pengeluaran"
-                              : "Surplus"}
+                              : "Arus kas bersih"}
                         </span>
                         <strong
                           className={`num ${delta === 0 ? "" : (k === "expense" ? delta > 0 : delta < 0) ? "negative" : "positive"}`}
@@ -1358,13 +1614,13 @@ export function App() {
                         }
                       >
                         <div className="goal-amount num">
-                          {money(g.saved)}
+                          <AnimatedMoney value={g.saved} />
                           <span>dari {money(g.target)}</span>
                         </div>
-                        <progress
+                        <GoalProgress
                           value={g.saved}
                           max={g.target}
-                          aria-label={`Progres ${g.name}`}
+                          label={`Progres ${g.name}`}
                         />
                         <div className="key-value">
                           <span>{pct(p.progress)} terkumpul</span>
@@ -1435,13 +1691,12 @@ export function App() {
             <div className="settings-layout">
               <Section title="Profil & anggaran">
                 <form
-                  key={`${wallet.name}-${wallet.opening}-${wallet.budget}`}
+                  key={`${wallet.name}-${wallet.budget}`}
                   onSubmit={onSubmit(async (f) =>
                     commit(
                       {
                         ...wallet,
                         name: formText(f, "name"),
-                        opening: parseAmount(formText(f, "opening"), true),
                         budget: parseAmount(formText(f, "budget"), true),
                       },
                       "Pengaturan tersimpan.",
@@ -1458,16 +1713,6 @@ export function App() {
                     />
                   </label>
                   <AmountField
-                    label="Saldo awal pencatatan"
-                    name="opening"
-                    value={wallet.opening}
-                    zero
-                  />
-                  <p className="hint">
-                    Mengubah saldo awal mengubah saldo total. Untuk uang baru,
-                    tambahkan transaksi pemasukan.
-                  </p>
-                  <AmountField
                     label="Anggaran pengeluaran bulanan"
                     name="budget"
                     value={wallet.budget}
@@ -1483,6 +1728,21 @@ export function App() {
                 </form>
               </Section>
               <div className="settings-side">
+                <PrivacySettings wallet={wallet} />
+                <CategoryBudgets
+                  wallet={wallet}
+                  busy={busy}
+                  save={(next, message) =>
+                    run(() => commit(next, message, true))
+                  }
+                />
+                <ManageCategories
+                  wallet={wallet}
+                  busy={busy}
+                  save={(next, message) =>
+                    run(() => commit(next, message, true))
+                  }
+                />
                 <Section title="Cadangan & data">
                   <p className="muted">
                     Catatan tersimpan di perangkat ini. Simpan cadangan secara
@@ -1490,19 +1750,12 @@ export function App() {
                     aplikasi.
                   </p>
                   <button
-                    className="wide"
+                    className="primary wide"
                     disabled={busy}
-                    onClick={() =>
-                      void run(() =>
-                        exportFile(
-                          `saku-cadangan-${today()}.json`,
-                          JSON.stringify(wallet, null, 2),
-                        ),
-                      )
-                    }
+                    onClick={() => open({ kind: "backup-export" })}
                   >
                     <Download size={17} />
-                    Ekspor cadangan JSON
+                    Ekspor cadangan berpassword
                   </button>
                   <button
                     className="wide"
@@ -1519,7 +1772,7 @@ export function App() {
                       void run(() =>
                         exportFile(
                           `saku-transaksi-${today()}.csv`,
-                          csv(ordered),
+                          csv(ordered, wallet.accounts),
                           "text/csv",
                         ),
                       )
@@ -1529,16 +1782,16 @@ export function App() {
                     Ekspor semua transaksi CSV
                   </button>
                   <p className="hint">
-                    File JSON dan CSV hasil ekspor tidak dienkripsi. Simpan di
-                    tempat pribadi dan bagikan hanya kepada pihak yang kamu
-                    pilih.
+                    Cadangan JSON baru dilindungi kata sandi; cadangan lama
+                    tetap bisa diimpor. CSV tidak dienkripsi. Simpan kata sandi
+                    terpisah karena tidak ada pemulihan lewat server.
                   </p>
                 </Section>
                 <Section title="Tentang Saku">
                   <div className="about-brand">
                     <Mark />
                     <span>saku.</span>
-                    <small>v1.2.5</small>
+                    <small>v1.5.0</small>
                   </div>
                   <p className="muted">
                     Catat pengeluaran, pahami kebiasaan, dan sisihkan uang untuk
@@ -1546,8 +1799,8 @@ export function App() {
                     tanpa iklan.
                   </p>
                   <p className="hint">
-                    Di Android, catatan dienkripsi di perangkat dan aplikasi
-                    tidak memiliki izin internet. Gunakan kunci layar untuk
+                    Di aplikasi Android/iOS, catatan dienkripsi di perangkat.
+                    Semua fitur inti berjalan offline. Gunakan kunci layar untuk
                     membatasi akses. Data terhapus jika aplikasi di-uninstall;
                     simpan cadangan secara berkala.
                   </p>
@@ -1573,6 +1826,7 @@ export function App() {
       </main>
       {hiddenImport}
       {confirmation}
+      {backupDialog}
       {modal?.kind === "transaction" && (
         <Dialog
           title={modal.transaction ? "Edit transaksi" : "Catat transaksi"}
@@ -1582,6 +1836,7 @@ export function App() {
             onSubmit={onSubmit(async (f) => {
               const t: Transaction = {
                 id: modal.transaction?.id ?? crypto.randomUUID(),
+                accountId: formText(f, "accountId"),
                 kind: txKind,
                 amount: parseAmount(formText(f, "amount")),
                 category: formText(f, "category"),
@@ -1598,6 +1853,7 @@ export function App() {
                     : [t, ...wallet.transactions],
                 },
                 "Transaksi tersimpan.",
+                true,
               );
             })}
           >
@@ -1622,6 +1878,10 @@ export function App() {
                 </button>
               ))}
             </div>
+            <AccountSelect
+              wallet={wallet}
+              value={modal.transaction?.accountId}
+            />
             <AmountField value={modal.transaction?.amount} />
             <div className="form-two">
               <label>
@@ -1632,10 +1892,10 @@ export function App() {
                   defaultValue={
                     modal.transaction?.kind === txKind
                       ? modal.transaction.category
-                      : categories[txKind][0]
+                      : categoryNames(wallet, txKind)[0]
                   }
                 >
-                  {categories[txKind].map((c) => (
+                  {categoryNames(wallet, txKind).map((c) => (
                     <option key={c}>{c}</option>
                   ))}
                 </select>
@@ -1685,6 +1945,7 @@ export function App() {
                             ),
                           },
                           "Transaksi dihapus.",
+                          true,
                         ),
                     });
                   }}

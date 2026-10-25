@@ -1,6 +1,17 @@
 package com.velorastudio.saku;
 
 import android.content.Context;
+import android.content.Intent;
+import android.app.Activity;
+import android.app.KeyguardManager;
+import android.hardware.biometrics.BiometricPrompt;
+import android.hardware.biometrics.BiometricManager;
+import android.os.Build;
+import android.os.CancellationSignal;
+import android.view.WindowManager;
+import android.view.View;
+import androidx.activity.result.ActivityResult;
+import com.getcapacitor.annotation.ActivityCallback;
 import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import android.util.AtomicFile;
@@ -26,6 +37,134 @@ import org.json.JSONObject;
 public class SecureWalletPlugin extends Plugin {
     private static final String ALIAS = "com.velorastudio.saku.wallet.v1";
     private static final int MAX_BYTES = 10 * 1024 * 1024;
+    private volatile boolean unlocked = false;
+    private volatile boolean authenticating = false;
+
+    private boolean lockEnabled() {
+        return getContext().getSharedPreferences("SakuPrivacy", Context.MODE_PRIVATE).getBoolean("lock", false);
+    }
+    private boolean allowed(PluginCall call) {
+        if (!lockEnabled() || unlocked) return true;
+        call.reject("Buka kunci Saku terlebih dahulu.");
+        return false;
+    }
+    private void protectScreen() {
+        getActivity().runOnUiThread(() -> {
+            if (lockEnabled()) getActivity().getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+            else getActivity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE);
+        });
+    }
+    @PluginMethod
+    public void getLockStatus(PluginCall call) {
+        KeyguardManager keyguard = (KeyguardManager) getContext().getSystemService(Context.KEYGUARD_SERVICE);
+        JSObject result = new JSObject();
+        result.put("enabled", lockEnabled());
+        result.put("available", keyguard != null && keyguard.isDeviceSecure());
+        result.put("unlocked", !lockEnabled() || unlocked);
+        call.resolve(result);
+    }
+    private void authenticated(PluginCall call) {
+        if (call.getData().has("enabled")) {
+            boolean enabled = Boolean.TRUE.equals(call.getBoolean("enabled"));
+            if (enabled && !SakuWidget.hide(getContext())) {
+                authenticating = false;
+                call.reject("Ringkasan widget belum berhasil dibersihkan. Coba aktifkan kunci lagi."); return;
+            }
+            if (!getContext().getSharedPreferences("SakuPrivacy", Context.MODE_PRIVATE).edit().putBoolean("lock", enabled).commit()) {
+                authenticating = false;
+                call.reject("Pengaturan kunci belum tersimpan."); return;
+            }
+        }
+        unlocked = true;
+        authenticating = false;
+        protectScreen();
+        call.resolve();
+    }
+    @PluginMethod
+    public void setLock(PluginCall call) { authenticate(call); }
+
+    @PluginMethod
+    public void authenticate(PluginCall call) {
+        if (authenticating) { call.reject("Verifikasi sedang berjalan."); return; }
+        KeyguardManager keyguard = (KeyguardManager) getContext().getSystemService(Context.KEYGUARD_SERVICE);
+        if (keyguard == null || !keyguard.isDeviceSecure()) { call.reject("Atur kunci layar perangkat terlebih dahulu."); return; }
+        authenticating = true;
+        getActivity().runOnUiThread(() -> {
+            try {
+                if (Build.VERSION.SDK_INT >= 29) {
+                    BiometricPrompt.Builder builder = new BiometricPrompt.Builder(getActivity())
+                        .setTitle("Buka Saku").setDescription("Verifikasi untuk mengakses catatan keuangan.");
+                    if (Build.VERSION.SDK_INT >= 30) builder.setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG | BiometricManager.Authenticators.DEVICE_CREDENTIAL);
+                    else builder.setDeviceCredentialAllowed(true);
+                    builder.build().authenticate(new CancellationSignal(), getActivity().getMainExecutor(), new BiometricPrompt.AuthenticationCallback() {
+                        @Override public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) { authenticated(call); }
+                        @Override public void onAuthenticationError(int code, CharSequence message) {
+                            authenticating = false;
+                            call.reject("Verifikasi dibatalkan atau belum berhasil. Coba lagi.");
+                        }
+                    });
+                } else {
+                    Intent intent = keyguard.createConfirmDeviceCredentialIntent("Buka Saku", "Verifikasi untuk mengakses catatan keuangan.");
+                    if (intent == null) throw new IllegalStateException("No credential");
+                    startActivityForResult(call, intent, "credentialResult");
+                }
+            } catch (Exception error) {
+                authenticating = false;
+                call.reject("Verifikasi perangkat belum tersedia.");
+            }
+        });
+    }
+    @ActivityCallback
+    private void credentialResult(PluginCall call, ActivityResult result) {
+        if (call == null) { authenticating = false; return; }
+        if (result.getResultCode() == Activity.RESULT_OK) authenticated(call);
+        else { authenticating = false; call.reject("Verifikasi dibatalkan."); }
+    }
+    @Override protected void handleOnPause() {
+        if (!authenticating) unlocked = false;
+        if (lockEnabled() && getBridge().getWebView() != null) getBridge().getWebView().setVisibility(View.INVISIBLE);
+        JSObject event = new JSObject(); event.put("isActive", false);
+        notifyListeners("privacyStateChanged", event);
+    }
+    @Override protected void handleOnResume() {
+        JSObject event = new JSObject(); event.put("isActive", true);
+        notifyListeners("privacyStateChanged", event);
+    }
+    @PluginMethod public void screenReady(PluginCall call) {
+        getActivity().runOnUiThread(() -> {
+            if (!lockEnabled() || unlocked || Boolean.TRUE.equals(call.getBoolean("locked", false)))
+                getBridge().getWebView().setVisibility(View.VISIBLE);
+            call.resolve();
+        });
+    }
+    @PluginMethod public void getWidgetStatus(PluginCall call) {
+        if (!allowed(call)) return;
+        JSObject result = new JSObject();
+        result.put("visible", SakuWidget.preferences(getContext()).getBoolean("visible", false) && !lockEnabled());
+        call.resolve(result);
+    }
+    @PluginMethod public void updateWidget(PluginCall call) {
+        if (!allowed(call)) return;
+        android.content.SharedPreferences preferences = SakuWidget.preferences(getContext());
+        boolean visible = !lockEnabled() && Boolean.TRUE.equals(call.getBoolean("visible", preferences.getBoolean("visible", false)));
+        if (!visible) {
+            if (SakuWidget.hide(getContext())) call.resolve();
+            else call.reject("Pengaturan widget belum tersimpan. Coba lagi.");
+            return;
+        }
+        String balance = call.getString("balance", "—");
+        String budget = call.getString("budget", "—");
+        String date = call.getString("date", "");
+        String month = call.getString("month", "");
+        if (balance.length() > 60 || budget.length() > 60 || !date.matches("\\d{4}-\\d{2}-\\d{2}") || !month.matches("\\d{4}-\\d{2}")) {
+            call.reject("Ringkasan widget tidak valid."); return;
+        }
+        if (!preferences.edit().putBoolean("visible", true).putString("balance", balance).putString("budget", budget).putString("date", date).putString("month", month).commit()) {
+            call.reject("Ringkasan widget belum tersimpan."); return;
+        }
+        SakuWidget.refresh(getContext());
+        call.resolve();
+    }
 
     private AtomicFile walletFile() {
         return new AtomicFile(new File(getContext().getNoBackupFilesDir(), "wallet.v1.enc"));
@@ -48,6 +187,7 @@ public class SecureWalletPlugin extends Plugin {
 
     @PluginMethod
     public synchronized void read(PluginCall call) {
+        if (!allowed(call)) return;
         try {
             AtomicFile file = walletFile();
             // AtomicFile also recovers an interrupted write from its backup.
@@ -75,6 +215,7 @@ public class SecureWalletPlugin extends Plugin {
 
     @PluginMethod
     public synchronized void write(PluginCall call) {
+        if (!allowed(call)) return;
         AtomicFile file = walletFile();
         FileOutputStream output = null;
         try {
@@ -106,6 +247,7 @@ public class SecureWalletPlugin extends Plugin {
 
     @PluginMethod
     public void clearLegacy(PluginCall call) {
+        if (!allowed(call)) return;
         android.content.SharedPreferences legacy = getContext()
             .getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
         if (legacy.contains("saku.wallet.v1") && !legacy.edit().remove("saku.wallet.v1").commit()) {
@@ -117,6 +259,8 @@ public class SecureWalletPlugin extends Plugin {
 
     @Override
     public void load() {
+        protectScreen();
+        if (lockEnabled()) SakuWidget.hide(getContext());
         long cutoff = System.currentTimeMillis() - 24 * 60 * 60 * 1000L;
         File[] exports = new File(getContext().getCacheDir(), "exports").listFiles();
         if (exports != null) {
