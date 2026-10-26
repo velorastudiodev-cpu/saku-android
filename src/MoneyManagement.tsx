@@ -6,6 +6,7 @@ import {
   parseAmount,
   today,
   type Account,
+  type CategoryBudget,
   type Wallet,
 } from "./domain";
 import {
@@ -64,64 +65,96 @@ export function AccountsPanel({ wallet, busy, save }: Props) {
       setError(e instanceof Error ? e.message : "Perubahan belum tersimpan.");
     }
   }
+  function cancel() {
+    setEditing(null);
+    setTransfer(false);
+    setError("");
+  }
   return (
-    <details className="panel feature-panel">
-      <summary>
-        Dompet & transfer{" "}
-        <span className="muted">{wallet.accounts.length} dompet</span>
-      </summary>
+    <section className="panel feature-panel">
+      <div className="section-head">
+        <h2>
+          {editing
+            ? current
+              ? "Edit dompet"
+              : "Dompet baru"
+            : transfer
+              ? "Pindahkan uang"
+              : "Uangmu ada di mana?"}
+        </h2>
+        {!editing && !transfer && (
+          <span className="muted">{wallet.accounts.length} dompet</span>
+        )}
+      </div>
       <p className="hint">
-        Pisahkan tunai, rekening, dan e-wallet. Transfer antar-dompet tidak
-        dihitung sebagai pemasukan atau pengeluaran.
+        {editing
+          ? "Beri nama sesuai tempat kamu menyimpan uang."
+          : transfer
+            ? "Pindahkan catatan saldo antar-dompet. Total uangmu tetap sama."
+            : "Pisahkan uang tunai, rekening, dan e-wallet agar saldonya mudah dilihat."}
       </p>
-      {wallet.accounts.map((a) => (
-        <div className="account-row" key={a.id}>
-          <div>
-            <strong>{a.name}</strong>
-            <span
-              className={
-                accountBalance(wallet, a.id) < 0 ? "negative num" : "num"
-              }
-            >
-              {money(accountBalance(wallet, a.id))}
-            </span>
-          </div>
-          <button
-            className="text-button"
-            disabled={busy}
-            onClick={() => {
-              setEditing(a);
-              setError("");
-            }}
-          >
-            Edit <span className="sr-only">{a.name}</span>
-          </button>
-        </div>
-      ))}
       {error && (
         <p className="form-error" role="alert">
           {error}
         </p>
       )}
-      {!editing && (
-        <div className="feature-actions">
-          <button
-            disabled={busy || wallet.accounts.length >= 30}
-            onClick={() => setEditing("new")}
-          >
-            Tambah dompet
-          </button>
-          <button
-            disabled={busy || wallet.accounts.length < 2}
-            onClick={() => setTransfer(!transfer)}
-          >
-            {transfer ? "Tutup transfer" : "Transfer uang"}
-          </button>
-        </div>
+      {!editing && !transfer && (
+        <>
+          <div className="feature-actions">
+            <button
+              className="primary"
+              disabled={busy || wallet.accounts.length >= 30}
+              onClick={() => {
+                setEditing("new");
+                setError("");
+              }}
+            >
+              Tambah dompet
+            </button>
+            <button
+              disabled={busy || wallet.accounts.length < 2}
+              onClick={() => {
+                setTransfer(true);
+                setError("");
+              }}
+            >
+              Pindahkan uang
+            </button>
+          </div>
+          {wallet.accounts.length < 2 && (
+            <p className="hint">
+              Tambahkan dompet kedua untuk memindahkan uang.
+            </p>
+          )}
+          {wallet.accounts.map((a) => (
+            <div className="account-row" key={a.id}>
+              <div>
+                <strong>{a.name}</strong>
+                <span
+                  className={
+                    accountBalance(wallet, a.id) < 0 ? "negative num" : "num"
+                  }
+                >
+                  {money(accountBalance(wallet, a.id))}
+                </span>
+              </div>
+              <button
+                className="text-button"
+                disabled={busy}
+                onClick={() => {
+                  setEditing(a);
+                  setError("");
+                }}
+              >
+                Edit <span className="sr-only">{a.name}</span>
+              </button>
+            </div>
+          ))}
+        </>
       )}
       {editing && (
         <form
-          className="recurring-form"
+          className="recurring-form feature-editor"
           key={current?.id ?? "new"}
           onSubmit={(e) => {
             e.preventDefault();
@@ -147,23 +180,23 @@ export function AccountsPanel({ wallet, busy, save }: Props) {
                   "Dompet tersimpan.",
                 )
               )
-                setEditing(null);
+                cancel();
             });
           }}
         >
-          <h3>{current ? "Edit dompet" : "Dompet baru"}</h3>
           <label>
             Nama dompet
             <input
               name="name"
               maxLength={40}
               required
+              autoFocus
               defaultValue={current?.name}
-              placeholder="Contoh: DANA"
+              placeholder="Misalnya: Tunai, BCA, atau DANA"
             />
           </label>
           <label>
-            Saldo awal pencatatan (Rp)
+            Saldo awal (Rp)
             <input
               name="opening"
               inputMode="numeric"
@@ -174,62 +207,71 @@ export function AccountsPanel({ wallet, busy, save }: Props) {
             />
           </label>
           <p className="hint">
-            Saldo awal bukan pemasukan. Jika uang berasal dari dompet lain yang
-            sudah dicatat, isi 0 lalu gunakan transfer.
+            Jika uangnya sudah tercatat di dompet lain, isi 0 lalu pilih
+            Pindahkan uang.
           </p>
           <div className="feature-actions">
             <button className="primary" disabled={busy}>
               Simpan dompet
             </button>
-            <button type="button" onClick={() => setEditing(null)}>
+            <button type="button" disabled={busy} onClick={cancel}>
               Batal
             </button>
-            {current && (
-              <button
-                type="button"
-                className="text-button danger"
-                disabled={
-                  busy ||
-                  !!used ||
-                  wallet.accounts.length === 1 ||
-                  current.opening !== 0
-                }
-                onClick={() =>
-                  void perform(async () => {
-                    if (
-                      await save(
-                        {
-                          ...wallet,
-                          accounts: wallet.accounts.filter(
-                            (a) => a.id !== current.id,
-                          ),
-                        },
-                        "Dompet kosong dihapus.",
-                      )
-                    )
-                      setEditing(null);
-                  })
-                }
-              >
-                Hapus dompet kosong
-              </button>
-            )}
           </div>
-          {current && (
+          <details className="feature-help">
+            <summary>
+              Tentang saldo awal{current ? " & penghapusan" : ""}
+            </summary>
             <p className="hint">
-              Dompet dengan saldo awal, transaksi, transfer, atau jadwal
-              dipertahankan untuk menjaga riwayat.
+              Saldo awal adalah uang yang sudah ada sebelum mulai mencatat,
+              bukan pemasukan baru. Mengubahnya akan mengubah saldo total.
             </p>
-          )}
+            {current && (
+              <>
+                <p className="hint">
+                  Dompet hanya bisa dihapus jika saldo awalnya nol dan belum
+                  digunakan oleh transaksi, transfer, atau jadwal. Riwayat yang
+                  sudah ada tetap dijaga.
+                </p>
+                <button
+                  type="button"
+                  className="text-button danger"
+                  disabled={
+                    busy ||
+                    !!used ||
+                    wallet.accounts.length === 1 ||
+                    current.opening !== 0
+                  }
+                  onClick={() =>
+                    void perform(async () => {
+                      if (
+                        await save(
+                          {
+                            ...wallet,
+                            accounts: wallet.accounts.filter(
+                              (a) => a.id !== current.id,
+                            ),
+                          },
+                          "Dompet kosong dihapus.",
+                        )
+                      )
+                        cancel();
+                    })
+                  }
+                >
+                  Hapus dompet kosong
+                </button>
+              </>
+            )}
+          </details>
         </form>
       )}
       {transfer && (
         <form
-          className="recurring-form"
+          className="recurring-form feature-editor"
           onSubmit={(e) => {
             e.preventDefault();
-            const form = e.currentTarget;
-            const f = new FormData(form);
+            const f = new FormData(e.currentTarget);
             void perform(async () => {
               const next = transferMoney(wallet, {
                 id: crypto.randomUUID(),
@@ -239,66 +281,71 @@ export function AccountsPanel({ wallet, busy, save }: Props) {
                 date: String(f.get("date")),
                 note: String(f.get("note") || "").trim(),
               });
-              if (await save(next, "Transfer tersimpan.")) {
-                form.reset();
-                setTransfer(false);
-              }
+              if (await save(next, "Uang dipindahkan antar-dompet.")) cancel();
             });
           }}
         >
-          <h3>Transfer antar-dompet</h3>
           <div className="form-two">
-            <AccountSelect wallet={wallet} name="from" label="Dari" />
+            <AccountSelect wallet={wallet} name="from" label="Dari dompet" />
             <AccountSelect
               wallet={wallet}
               name="to"
-              label="Ke"
+              label="Ke dompet"
               value={wallet.accounts[1]?.id}
             />
           </div>
-          <div className="form-two">
-            <label>
-              Nominal (Rp)
-              <input
-                name="amount"
-                inputMode="numeric"
-                pattern="[0-9]+"
-                maxLength={13}
-                required
-              />
-            </label>
-            <label>
-              Tanggal
-              <input
-                type="date"
-                name="date"
-                defaultValue={today()}
-                max={today()}
-                required
-              />
-            </label>
-          </div>
           <label>
-            Catatan (opsional)
-            <input name="note" maxLength={120} />
+            Berapa yang dipindahkan? (Rp)
+            <input
+              name="amount"
+              inputMode="numeric"
+              pattern="[0-9]+"
+              maxLength={13}
+              required
+              autoFocus
+              placeholder="50000"
+            />
           </label>
+          <label>
+            Tanggal
+            <input
+              type="date"
+              name="date"
+              defaultValue={today()}
+              max={today()}
+              required
+            />
+          </label>
+          <details className="feature-help">
+            <summary>Tambahkan catatan</summary>
+            <label>
+              Catatan (opsional)
+              <input name="note" maxLength={120} />
+            </label>
+          </details>
           <p className="hint">
-            Biaya admin, jika ada, dicatat sebagai pengeluaran terpisah.
+            Pemindahan ini tidak dihitung sebagai pemasukan atau pengeluaran.
+            Biaya admin dicatat terpisah sebagai pengeluaran.
           </p>
-          <button className="primary" disabled={busy}>
-            Simpan transfer
-          </button>
+          <div className="feature-actions">
+            <button className="primary" disabled={busy}>
+              Pindahkan uang
+            </button>
+            <button type="button" disabled={busy} onClick={cancel}>
+              Batal
+            </button>
+          </div>
         </form>
       )}
-      {!!wallet.transfers.length && (
+      {!editing && !transfer && !!wallet.transfers.length && (
         <details className="transfer-history">
           <summary>
-            Riwayat transfer{" "}
+            Riwayat pemindahan{" "}
             <span className="muted">{wallet.transfers.length}</span>
           </summary>
           {[...wallet.transfers]
             .sort((a, b) => b.date.localeCompare(a.date))
-            .slice(0, all ? undefined : 10)
+            .slice(0, all ? undefined : 5)
             .map((t) => (
               <div className="account-row" key={t.id}>
                 <div>
@@ -323,171 +370,261 @@ export function AccountsPanel({ wallet, busy, save }: Props) {
                           (old) => old.id !== t.id,
                         ),
                       },
-                      "Transfer dihapus; saldo dompet disesuaikan.",
+                      "Pemindahan dihapus; saldo dompet disesuaikan.",
                     )
                   }
                 >
                   Hapus
-                  <span className="sr-only"> transfer {money(t.amount)}</span>
+                  <span className="sr-only"> pemindahan {money(t.amount)}</span>
                 </button>
               </div>
             ))}
-          {wallet.transfers.length > 10 && !all && (
-            <button className="text-button" onClick={() => setAll(true)}>
-              Lihat semua transfer
+          {wallet.transfers.length > 5 && (
+            <button className="text-button" onClick={() => setAll(!all)}>
+              {all ? "Tampilkan lebih sedikit" : "Lihat semua pemindahan"}
             </button>
           )}
         </details>
       )}
-    </details>
+    </section>
   );
 }
 
 export function CategoryBudgets({ wallet, busy, save }: Props) {
+  const [editing, setEditing] = useState<CategoryBudget | "new" | null>(null);
   const [error, setError] = useState("");
+  const current = typeof editing === "object" ? editing : null;
   const statuses = budgetStatus(wallet);
   const sum = wallet.categoryBudgets.reduce((n, b) => n + b.limit, 0);
   return (
-    <details className="panel feature-panel">
-      <summary>
-        Anggaran kategori <span className="muted">{statuses.length} batas</span>
-      </summary>
+    <section className="panel feature-panel">
+      <div className="section-head">
+        <h2>
+          {editing
+            ? current
+              ? "Ubah batas belanja"
+              : "Batas belanja baru"
+            : "Batas per kategori"}
+        </h2>
+        {!editing && <span className="muted">{statuses.length} kategori</span>}
+      </div>
       <p className="hint">
-        Batas dipakai setiap bulan. Peringatan muncul pada 80% dan 100%
-        pemakaian; saldo tidak berubah.
+        Tentukan batas bulanan untuk makan, transportasi, atau kebutuhan lain.
       </p>
-      {statuses.map((b) => (
-        <div className="budget-item" key={b.category}>
-          <div className="key-value">
-            <strong>{b.category}</strong>
-            <span className="num">
-              {money(b.used)} / {money(b.limit)}
-            </span>
-          </div>
-          <progress
-            max={b.limit}
-            value={Math.min(b.used, b.limit)}
-            aria-label={`Anggaran ${b.category}`}
-            className={b.ratio >= 1 ? "over" : ""}
-          />
-          <div className="key-value">
-            <span className={b.ratio >= 1 ? "negative" : "hint"}>
-              {b.ratio >= 1
-                ? `Batas tercapai${b.remaining < 0 ? `, lebih ${money(-b.remaining)}` : ""}`
-                : b.ratio >= 0.8
-                  ? "Sudah terpakai 80% atau lebih"
-                  : `Sisa ${money(b.remaining)}`}
-            </span>
-            <button
-              className="text-button"
-              disabled={busy}
-              onClick={() =>
-                void save(
-                  {
-                    ...wallet,
-                    categoryBudgets: wallet.categoryBudgets.filter(
-                      (x) => x.category !== b.category,
-                    ),
-                  },
-                  "Batas kategori dihapus.",
-                )
-              }
-            >
-              Hapus<span className="sr-only"> batas {b.category}</span>
-            </button>
-          </div>
-        </div>
-      ))}
+      {!editing && (
+        <>
+          <button
+            className="primary"
+            disabled={busy}
+            onClick={() => {
+              setEditing("new");
+              setError("");
+            }}
+          >
+            Atur batas kategori
+          </button>
+          {!statuses.length && (
+            <p className="feature-empty">
+              Mulai dari kategori yang paling sering kamu pakai. Saku akan
+              mengingatkan saat batasnya hampir habis.
+            </p>
+          )}
+          {statuses.map((b) => (
+            <div className="budget-item" key={b.category}>
+              <div className="key-value">
+                <strong>{b.category}</strong>
+                <span className="num">
+                  {money(b.used)} / {money(b.limit)}
+                </span>
+              </div>
+              <progress
+                max={b.limit}
+                value={Math.min(b.used, b.limit)}
+                aria-label={`Anggaran ${b.category}`}
+                className={b.ratio >= 1 ? "over" : ""}
+              />
+              <div className="key-value">
+                <span className={b.ratio >= 1 ? "negative" : "hint"}>
+                  {b.ratio >= 1
+                    ? b.remaining < 0
+                      ? `Lewat ${money(-b.remaining)}`
+                      : "Batas bulan ini sudah habis"
+                    : b.ratio >= 0.8
+                      ? "Hampir habis · 80% sudah terpakai"
+                      : `Masih ada ${money(b.remaining)}`}
+                </span>
+                <button
+                  className="text-button"
+                  disabled={busy}
+                  onClick={() => {
+                    setEditing({ category: b.category, limit: b.limit });
+                    setError("");
+                  }}
+                >
+                  Ubah<span className="sr-only"> batas {b.category}</span>
+                </button>
+              </div>
+            </div>
+          ))}
+        </>
+      )}
       {wallet.budget > 0 && sum > wallet.budget && (
         <p className="notice">
-          Total batas kategori {money(sum)} melebihi anggaran keseluruhan{" "}
-          {money(wallet.budget)}. Batas keseluruhan tetap menjadi acuan Boleh
-          Jajan.
+          Batas kategori berjumlah {money(sum)}, melebihi anggaran bulanan{" "}
+          {money(wallet.budget)}. Boleh Jajan tetap memakai batas bulanan.
         </p>
       )}
-      <form
-        className="recurring-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const form = e.currentTarget;
-          const f = new FormData(form);
-          setError("");
-          void (async () => {
-            try {
-              const category = String(f.get("category"));
-              const limit = parseAmount(String(f.get("amount")));
-              if (
-                await save(
-                  {
-                    ...wallet,
-                    categoryBudgets: [
-                      ...wallet.categoryBudgets.filter(
-                        (b) => b.category !== category,
-                      ),
-                      { category, limit },
-                    ],
-                  },
-                  "Anggaran kategori tersimpan.",
+      {editing && (
+        <form
+          className="recurring-form feature-editor"
+          key={current?.category ?? "new"}
+          onSubmit={(e) => {
+            e.preventDefault();
+            const f = new FormData(e.currentTarget);
+            setError("");
+            void (async () => {
+              try {
+                const category = String(f.get("category"));
+                const limit = parseAmount(String(f.get("amount")));
+                if (
+                  await save(
+                    {
+                      ...wallet,
+                      categoryBudgets: [
+                        ...wallet.categoryBudgets.filter(
+                          (b) => b.category !== category,
+                        ),
+                        { category, limit },
+                      ],
+                    },
+                    "Batas belanja tersimpan.",
+                  )
                 )
-              )
-                form.reset();
-            } catch (e) {
-              setError(
-                e instanceof Error ? e.message : "Anggaran belum tersimpan.",
-              );
-            }
-          })();
-        }}
-      >
-        <h3>Atur batas kategori</h3>
-        <div className="form-two">
+                  setEditing(null);
+              } catch (e) {
+                setError(
+                  e instanceof Error ? e.message : "Anggaran belum tersimpan.",
+                );
+              }
+            })();
+          }}
+        >
           <label>
             Kategori
-            <select name="category">
-              {categoryNames(wallet, "expense").map((name) => (
-                <option key={name}>{name}</option>
-              ))}
-            </select>
+            {current ? (
+              <input name="category" value={current.category} readOnly />
+            ) : (
+              <select name="category">
+                {categoryNames(wallet, "expense").map((name) => (
+                  <option key={name}>{name}</option>
+                ))}
+              </select>
+            )}
           </label>
           <label>
-            Batas bulanan (Rp)
+            Batas per bulan (Rp)
             <input
               name="amount"
               inputMode="numeric"
               pattern="[0-9]+"
               maxLength={13}
+              defaultValue={current?.limit}
+              autoFocus
               required
+              placeholder="150000"
             />
           </label>
-        </div>
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="feature-actions">
+            <button className="primary" disabled={busy}>
+              Simpan batas
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                setEditing(null);
+                setError("");
+              }}
+            >
+              Batal
+            </button>
+          </div>
+          {current ? (
+            <button
+              type="button"
+              className="text-button danger"
+              disabled={busy}
+              onClick={() =>
+                void (async () => {
+                  if (
+                    await save(
+                      {
+                        ...wallet,
+                        categoryBudgets: wallet.categoryBudgets.filter(
+                          (b) => b.category !== current.category,
+                        ),
+                      },
+                      "Batas kategori dihapus.",
+                    )
+                  )
+                    setEditing(null);
+                })()
+              }
+            >
+              Hapus batas ini
+            </button>
+          ) : (
+            <p className="hint">
+              Jika kategori sudah punya batas, nominal baru akan
+              menggantikannya.
+            </p>
+          )}
+        </form>
+      )}
+      <details className="feature-help">
+        <summary>Cara kerja anggaran</summary>
         <p className="hint">
-          Menyimpan kategori yang sama mengganti batas sebelumnya.
+          Batas berlaku setiap bulan dan tidak memindahkan uang. Peringatan
+          muncul pada 80% dan 100% pemakaian. Anggaran bulanan mengatur total
+          belanja; batas kategori membantu membaginya.
         </p>
-        {error && (
-          <p className="form-error" role="alert">
-            {error}
-          </p>
-        )}
-        <button disabled={busy}>Simpan batas</button>
-      </form>
-    </details>
+      </details>
+    </section>
   );
 }
 
 export function BudgetAlerts({ wallet }: { wallet: Wallet }) {
   const alerts = budgetStatus(wallet).filter((b) => b.ratio >= 0.8);
   if (!alerts.length) return null;
+  const first = alerts[0];
   return (
     <div className="notice" role="status">
-      {alerts.map((b) => (
-        <p key={b.category}>
-          <strong>{b.category}:</strong>{" "}
-          {b.ratio >= 1
-            ? "batas anggaran tercapai"
-            : "80% anggaran sudah terpakai"}{" "}
-          ({money(b.used)} dari {money(b.limit)}).
-        </p>
-      ))}
+      <p>
+        <strong>{first.category}:</strong>{" "}
+        {first.ratio >= 1
+          ? "batas bulan ini sudah habis"
+          : "anggaran hampir habis"}{" "}
+        ({money(first.used)} dari {money(first.limit)}).
+      </p>
+      {alerts.length > 1 && (
+        <details className="feature-help">
+          <summary>
+            {alerts.length - 1} kategori lain perlu diperhatikan
+          </summary>
+          {alerts.slice(1).map((b) => (
+            <p key={b.category}>
+              <strong>{b.category}:</strong>{" "}
+              {b.ratio >= 1 ? "batas tercapai" : "80% terpakai"} (
+              {money(b.used)} dari {money(b.limit)}).
+            </p>
+          ))}
+        </details>
+      )}
     </div>
   );
 }
@@ -504,22 +641,23 @@ export function SpendingGuide({ wallet }: { wallet: Wallet }) {
     Math.min(room.daily, budget?.remaining ?? room.daily),
   );
   return (
-    <section
-      className="daily-pocket spending-guide"
-      aria-labelledby="jajan-title"
-    >
-      <h2 id="jajan-title">Boleh Jajan?</h2>
-      <span className="muted">Ruang belanja tersisa hari ini</span>
-      <strong className="num">{money(room.daily)}</strong>
+    <section className="panel spending-guide" aria-labelledby="jajan-title">
+      <div className="jajan-heading">
+        <div>
+          <h2 id="jajan-title">Boleh jajan hari ini?</h2>
+          <p className="muted">Perkiraan ruang belanja tersisa</p>
+        </div>
+        <strong className="num">{money(room.daily)}</strong>
+      </div>
       <p>
         {room.daily > 0
-          ? "Dalam batas catatan dan rencana yang tersedia."
-          : "Tahan dulu belanja tambahan; periksa saldo dan kebutuhan wajib."}
+          ? "Kebutuhan terjadwal dan tabungan tujuan sudah diperhitungkan."
+          : "Tahan dulu belanja tambahan. Cek saldo dan kebutuhan wajibmu."}
       </p>
-      <details>
-        <summary>Simulasikan belanja</summary>
+      <details className="jajan-simulator">
+        <summary>Cek rencana belanja</summary>
         <label>
-          Perkiraan belanja (Rp)
+          Mau belanja berapa? (Rp)
           <input
             inputMode="numeric"
             pattern="[0-9]+"
@@ -530,12 +668,12 @@ export function SpendingGuide({ wallet }: { wallet: Wallet }) {
           />
         </label>
         <label>
-          Kategori (opsional)
+          Untuk apa? (opsional)
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
           >
-            <option value="">Tanpa kategori</option>
+            <option value="">Pilih kategori</option>
             {categoryNames(wallet, "expense").map((c) => (
               <option key={c}>{c}</option>
             ))}
@@ -553,42 +691,47 @@ export function SpendingGuide({ wallet }: { wallet: Wallet }) {
             {numeric === null
               ? "Isi rupiah utuh, maksimal 1 triliun."
               : numeric <= allowance
-                ? `Masih dalam batas. Setelah belanja, ruang hari ini ${money(allowance - numeric)}.`
-                : `Melebihi ruang belanja ${money(numeric - allowance)}. Pertimbangkan menunda atau mengurangi nominal.`}
+                ? `Masih dalam batas. Setelah belanja, ruang hari ini tersisa ${money(allowance - numeric)}.`
+                : `Melebihi ruang belanja ${money(numeric - allowance)}. Coba kurangi nominal atau tunda dulu.`}
           </p>
         )}
-        <div className="key-value">
-          <span>Sisa hari bulan ini</span>
-          <strong>{room.days} hari</strong>
-        </div>
-        <div className="key-value">
-          <span>Pengeluaran hari ini</span>
-          <span className="num">{money(room.spentToday)}</span>
-        </div>
-        <div className="key-value">
-          <span>Kebutuhan terjadwal</span>
-          <span className="num">{money(room.mandatory)}</span>
-        </div>
-        <div className="key-value">
-          <span>Sisa anggaran</span>
-          <span className="num">
-            {room.budgetRemaining === null
-              ? "Belum diatur"
-              : money(room.budgetRemaining)}
-          </span>
-        </div>
         <p className="hint">
-          Alokasi tujuan dan pengeluaran terjadwal yang belum dicatat sudah
-          disisihkan. Pemasukan mendatang tidak diasumsikan diterima.
-          Pengeluaran hari ini mengurangi jatah hari ini; batas kategori juga
-          berlaku saat dipilih.
+          Simulasi saja. Catat pengeluaran setelah kamu benar-benar belanja.
         </p>
-        <p className="hint">
-          Ini perkiraan berdasarkan catatan, bukan jaminan. Masukkan seluruh
-          kebutuhan wajib sebagai jadwal agar hitungannya berguna.
-          {!wallet.budget &&
-            " Atur anggaran bulanan untuk batas yang lebih terarah."}
-        </p>
+        <details className="feature-help">
+          <summary>Dasar perhitungan</summary>
+          <div className="key-value">
+            <span>Sisa hari bulan ini</span>
+            <strong>{room.days} hari</strong>
+          </div>
+          <div className="key-value">
+            <span>Sudah dibelanjakan hari ini</span>
+            <span className="num">{money(room.spentToday)}</span>
+          </div>
+          <div className="key-value">
+            <span>Kebutuhan terjadwal</span>
+            <span className="num">{money(room.mandatory)}</span>
+          </div>
+          <div className="key-value">
+            <span>Sisa anggaran bulanan</span>
+            <span className="num">
+              {room.budgetRemaining === null
+                ? "Belum diatur"
+                : money(room.budgetRemaining)}
+            </span>
+          </div>
+          <p className="hint">
+            Saldo setelah alokasi tujuan dan kebutuhan terjadwal dibagi ke sisa
+            hari. Belanja hari ini mengurangi jatah hari ini. Batas kategori
+            juga berlaku jika dipilih; pemasukan mendatang belum dihitung.
+          </p>
+          <p className="hint">
+            Perkiraan mengikuti catatanmu, bukan jaminan. Catat kebutuhan wajib
+            sebagai jadwal.
+            {!wallet.budget &&
+              " Atur anggaran bulanan di Rencana untuk batas yang lebih terarah."}
+          </p>
+        </details>
       </details>
     </section>
   );
@@ -597,23 +740,34 @@ export function SpendingGuide({ wallet }: { wallet: Wallet }) {
 export function SmartInsights({ wallet }: { wallet: Wallet }) {
   const notes = insights(wallet);
   return (
-    <section className="smart-insights" aria-label="Saku Insight 2.0">
+    <section className="smart-insights" aria-label="Saran Saku">
       {notes.length ? (
-        notes.map((n) => (
-          <article key={n.title}>
-            <h3>{n.title}</h3>
-            <p>{n.text}</p>
+        <>
+          <article>
+            <h3>{notes[0].title}</h3>
+            <p>{notes[0].text}</p>
           </article>
-        ))
+          {notes.length > 1 && (
+            <details className="insight-more">
+              <summary>Lihat {notes.length - 1} saran lainnya</summary>
+              {notes.slice(1).map((n) => (
+                <article key={n.title}>
+                  <h3>{n.title}</h3>
+                  <p>{n.text}</p>
+                </article>
+              ))}
+            </details>
+          )}
+        </>
       ) : (
         <p className="hint">
-          Catat pengeluaran secara rutin. Perbandingan kategori dan perkiraan
-          akhir bulan muncul ketika catatannya mencukupi.
+          Saran akan muncul seiring catatanmu bertambah. Mulai dari pengeluaran
+          hari ini.
         </p>
       )}
       <p className="hint">
-        Dihitung di perangkat, tanpa AI online. Catatan yang belum lengkap akan
-        memengaruhi saran.
+        Dihitung offline dari catatanmu. Catatan yang lengkap membuat perkiraan
+        lebih berguna.
       </p>
     </section>
   );

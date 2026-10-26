@@ -1,6 +1,6 @@
 {
   "name": "saku-personal-finance",
-  "version": "1.5.0",
+  "version": "1.5.5",
   "description": "Saku oleh Velora Studio Dev: keuangan offline dengan multi-dompet, anggaran kategori, Boleh Jajan, insight, widget Android, dan cadangan berpassword.",
   "scripts": {
     "dev": "vite",

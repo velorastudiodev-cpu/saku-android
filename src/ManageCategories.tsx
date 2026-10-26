@@ -19,9 +19,10 @@ export function ManageCategories({
   const [categoryError, setCategoryError] = useState("");
   return (
     <section className="panel feature-panel">
-      <h2>Kategori sendiri</h2>
+      <h2>Kategori buatanmu</h2>
       <p className="hint">
-        Beri nama yang mudah dikenali, seperti Kopi atau Kebutuhan anak.
+        Buat nama yang dekat dengan keseharianmu, seperti Kopi atau Kebutuhan
+        anak.
       </p>
       <form
         onSubmit={async (e) => {
@@ -80,7 +81,10 @@ export function ManageCategories({
             {categoryError}
           </p>
         )}
-        <button disabled={busy || wallet.customCategories[kind].length >= 50}>
+        <button
+          className="primary"
+          disabled={busy || wallet.customCategories[kind].length >= 50}
+        >
           Tambah kategori
         </button>
       </form>
@@ -126,11 +130,21 @@ export function ManageCategories({
           );
         })}
       </ul>
-      <p className="hint">
-        Kategori yang dipakai tidak bisa dihapus. Pindahkan transaksinya lewat
-        “Rapikan kategori” di Transaksi serta ubah jadwal dan anggaran terkait
-        terlebih dahulu.
-      </p>
+      {!wallet.customCategories[kind].length && (
+        <p className="feature-empty">
+          Belum ada kategori buatanmu untuk{" "}
+          {kind === "expense" ? "pengeluaran" : "pemasukan"}. Kategori bawaan
+          tetap tersedia saat mencatat.
+        </p>
+      )}
+      <details className="feature-help">
+        <summary>Mengapa kategori tidak bisa dihapus?</summary>
+        <p className="hint">
+          Kategori yang masih dipakai oleh transaksi, jadwal, atau anggaran
+          tetap dijaga. Pindahkan transaksi lewat Ubah kategori sekaligus di
+          Catatan, lalu sesuaikan jadwal dan anggarannya.
+        </p>
+      </details>
     </section>
   );
 }
@@ -153,10 +167,10 @@ export function BulkCategory({
   );
   return (
     <details className="bulk-category">
-      <summary>Rapikan kategori sekaligus</summary>
+      <summary>Ubah kategori sekaligus</summary>
       <p className="hint">
-        Mengikuti filter dan pencarian saat ini, termasuk hasil yang belum
-        tampil di daftar. Jadwal berulang tidak ikut diubah.
+        Pindahkan transaksi yang cocok dengan filter dan pencarian saat ini.
+        Jumlah di bawah termasuk hasil yang belum tampil; jadwal tetap sama.
       </p>
       <form
         onSubmit={(e) => {

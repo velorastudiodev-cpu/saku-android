@@ -23,7 +23,7 @@ test("first run, write transaction, reload, edit, delete and reconcile balance",
     money(500000),
   );
   await page
-    .getByRole("button", { name: "Catat transaksi", exact: true })
+    .getByRole("button", { name: "Catat pengeluaran", exact: true })
     .click();
   await page.locator("input[name=amount]").fill("25000");
   await page.locator("input[name=note]").fill("Makan siang");
@@ -57,7 +57,7 @@ test("income form changes categories and report calculates surplus", async ({
   await seeded(page);
   const before = balances(fixture()).available;
   await page
-    .getByRole("button", { name: "Catat transaksi", exact: true })
+    .getByRole("button", { name: "Catat pengeluaran", exact: true })
     .click();
   await page
     .getByRole("dialog")
@@ -82,7 +82,7 @@ test("goal creation, allocation, insufficient funds and deletion preserve total 
 }) => {
   await seeded(page);
   const before = balances(fixture()).available;
-  await page.getByRole("link", { name: "Tujuan", exact: true }).click();
+  await page.getByRole("link", { name: "Rencana", exact: true }).click();
   await page.getByRole("button", { name: "Tujuan baru", exact: true }).click();
   await page.getByLabel("Nama tujuan").fill("Laptop");
   await page.locator("input[name=amount]").fill("10000000");
@@ -98,18 +98,18 @@ test("goal creation, allocation, insufficient funds and deletion preserve total 
   await expect(page.getByRole("alert")).toContainText("tidak cukup");
   await page.locator("input[name=amount]").fill("100000");
   await page.getByRole("button", { name: "Simpan alokasi" }).click();
-  await page.getByRole("link", { name: "Ringkasan", exact: true }).click();
+  await page.getByRole("link", { name: "Beranda", exact: true }).click();
   await expect(page.getByTestId("available-balance")).toContainText(
     money(before - 100000),
   );
-  await page.getByRole("link", { name: "Tujuan", exact: true }).click();
+  await page.getByRole("link", { name: "Rencana", exact: true }).click();
   await page.getByRole("button", { name: "Edit tujuan Laptop" }).click();
   await page.getByRole("button", { name: "Hapus", exact: true }).click();
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "Hapus", exact: true })
     .click();
-  await page.getByRole("link", { name: "Ringkasan", exact: true }).click();
+  await page.getByRole("link", { name: "Beranda", exact: true }).click();
   await expect(page.getByTestId("available-balance")).toContainText(
     money(before),
   );
@@ -118,7 +118,7 @@ test("search filters rows and CSV exports the actual view", async ({
   page,
 }) => {
   await seeded(page);
-  await page.getByRole("link", { name: "Transaksi", exact: true }).click();
+  await page.getByRole("link", { name: "Catatan", exact: true }).click();
   await page
     .getByRole("textbox", { name: "Cari transaksi" })
     .fill("Makan siang");
@@ -132,7 +132,8 @@ test("backup rejects corrupt content, exports and restores valid data", async ({
   page,
 }) => {
   await seeded(page);
-  await page.getByRole("link", { name: "Pengaturan", exact: true }).click();
+  await page.getByRole("link", { name: "Lainnya", exact: true }).click();
+  await page.getByRole("button", { name: /Cadangan & data/ }).click();
   await page.getByLabel("Pilih cadangan JSON").setInputFiles({
     name: "bad.json",
     mimeType: "application/json",
@@ -149,7 +150,7 @@ test("backup rejects corrupt content, exports and restores valid data", async ({
   await page
     .getByRole("button", { name: "Pulihkan data", exact: true })
     .click();
-  await expect(page.getByLabel("Nama panggilan")).toHaveValue("Rani");
+  await expect(page.locator(".workspace-label")).toContainText("Rani");
   const pending = page.waitForEvent("download");
   await page
     .getByRole("button", { name: "Ekspor cadangan berpassword" })
@@ -162,12 +163,14 @@ test("backup rejects corrupt content, exports and restores valid data", async ({
   const download = await pending;
   expect(download.suggestedFilename()).toMatch(/\.json$/);
 });
-test("settings persists initial balance and budget", async ({ page }) => {
+test("monthly budget persists from the plan screen", async ({ page }) => {
   await seeded(page);
-  await page.getByRole("link", { name: "Pengaturan", exact: true }).click();
+  await page.getByRole("link", { name: "Rencana", exact: true }).click();
+  await page.getByRole("button", { name: "Anggaran", exact: true }).click();
   await page.locator("input[name=budget]").fill("2000000");
-  await page.getByRole("button", { name: "Simpan pengaturan" }).click();
+  await page.getByRole("button", { name: "Simpan anggaran" }).click();
   await page.reload();
+  await page.getByRole("button", { name: "Anggaran", exact: true }).click();
   await expect(page.locator("input[name=budget]")).toHaveValue("2000000");
 });
 test("corrupt local storage is not overwritten and can be recovered via import", async ({
@@ -232,7 +235,7 @@ test("screens and transaction dialog have no serious accessibility violations", 
   }
   await page.goto("/");
   await page
-    .getByRole("button", { name: "Catat transaksi", exact: true })
+    .getByRole("button", { name: "Catat pengeluaran", exact: true })
     .click();
   expect(
     (

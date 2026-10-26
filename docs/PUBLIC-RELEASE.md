@@ -31,3 +31,7 @@ Belum dilakukan: publikasi repositori, pendaftaran/verifikasi developer, pengaju
 ## Status 1.5.0
 
 Repositori Saku publik atas permintaan pemilik. Tahap 1.3–1.5 digabung menjadi rilis 1.5.0, versionCode 5: kategori custom, jadwal, Undo, cadangan berpassword, multi-dompet, anggaran kategori, widget Android, kunci aplikasi, Boleh Jajan, dan insight offline. Logo baru berasal dari gambar pemilik. Proyek iOS tersedia, tetapi bukan IPA siap pasang dan belum dikonfirmasi melalui Xcode/iPhone. Ketentuan Google/Apple serta batas pemeriksaan di atas tetap berlaku; lihat [catatan 1.5](RELEASE-1.5.md).
+
+## Status 1.5.5
+
+Pembaruan tampilan putih–hijau, lima menu yang lebih jelas, dan formulir bertahap. Paket dan penandatanganan tetap sama, versionCode 6. Tidak ada perubahan skema keuangan atau layanan online. Lihat [catatan 1.5.5](RELEASE-1.5.5.md) untuk rincian dan batas pemeriksaan.

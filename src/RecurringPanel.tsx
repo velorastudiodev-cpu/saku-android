@@ -27,6 +27,7 @@ export function RecurringPanel({
   const [kind, setKind] = useState<Kind>("expense");
   const [error, setError] = useState("");
   const [requesting, setRequesting] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const due = wallet.recurring.filter((r) => r.active && r.nextDate <= today());
   const current = typeof editing === "object" ? editing : null;
   const perform = async (task: () => Promise<void>) => {
@@ -38,96 +39,32 @@ export function RecurringPanel({
     }
   };
   return (
-    <details
-      className="panel recurring-panel"
-      open={due.length > 0 || undefined}
-    >
-      <summary>
-        <span>Transaksi berulang</span>
+    <section className="panel recurring-panel">
+      <div className="section-head">
+        <h2>
+          {editing
+            ? current
+              ? "Ubah jadwal"
+              : "Jadwal baru"
+            : "Uang yang berulang"}
+        </h2>
         <span className="muted">
           {due.length
             ? `${due.length} jadwal jatuh tempo`
             : `${wallet.recurring.filter((r) => r.active).length} jadwal aktif`}
         </span>
-      </summary>
+      </div>
       <p className="hint">
-        Konfirmasi saat jatuh tempo, atau catat otomatis saat Saku dibuka.
-        Jadwal yang terlewat tetap menunggu; saldo hanya berubah setelah
-        pencatatan.
+        Jadwalkan uang jajan, langganan, atau tagihan agar tidak terlupa.
       </p>
       {error && (
         <p className="form-error" role="alert">
           {error}
         </p>
       )}
-      <ul className="recurring-list">
-        {wallet.recurring.map((rule) => (
-          <li key={rule.id}>
-            <div>
-              <strong>{rule.note || rule.category}</strong>
-              <span className="num">
-                {rule.kind === "income" ? "+" : "−"}
-                {money(rule.amount)}
-              </span>
-            </div>
-            <p className="hint">
-              {rule.category} ·{" "}
-              {wallet.accounts.find((a) => a.id === rule.accountId)?.name} ·{" "}
-              {rule.frequency === "week" ? "Mingguan" : "Bulanan"} ·{" "}
-              {rule.active ? dateLabel(rule.nextDate, true) : "Dijeda"} ·{" "}
-              {rule.mode === "auto"
-                ? "Otomatis saat dibuka"
-                : "Konfirmasi dulu"}
-            </p>
-            <div className="feature-actions">
-              {rule.active && rule.nextDate <= today() && (
-                <>
-                  <button
-                    disabled={busy}
-                    onClick={() =>
-                      void perform(async () => {
-                        await save(
-                          settleRecurring(wallet, rule.id),
-                          "Transaksi rutin dicatat.",
-                        );
-                      })
-                    }
-                  >
-                    Catat {dateLabel(rule.nextDate, true)}
-                  </button>
-                  <button
-                    className="text-button"
-                    disabled={busy}
-                    onClick={() =>
-                      void perform(async () => {
-                        await save(
-                          settleRecurring(wallet, rule.id, true),
-                          "Kejadian ini dilewati.",
-                        );
-                      })
-                    }
-                  >
-                    Lewati kali ini
-                  </button>
-                </>
-              )}
-              <button
-                className="text-button"
-                disabled={busy}
-                onClick={() => {
-                  setEditing(rule);
-                  setKind(rule.kind);
-                  setError("");
-                }}
-              >
-                Edit jadwal
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
       {!editing && (
         <button
+          className="primary"
           disabled={busy || wallet.recurring.length >= 50}
           onClick={() => {
             setEditing("new");
@@ -138,9 +75,102 @@ export function RecurringPanel({
           Tambah jadwal
         </button>
       )}
+      {!editing && (
+        <>
+          <ul className="recurring-list">
+            {[...wallet.recurring]
+              .sort(
+                (a, b) =>
+                  Number(b.active) - Number(a.active) ||
+                  a.nextDate.localeCompare(b.nextDate),
+              )
+              .slice(0, showAll ? undefined : Math.max(5, due.length))
+              .map((rule) => (
+                <li key={rule.id}>
+                  <div>
+                    <strong>{rule.note || rule.category}</strong>
+                    <span className="num">
+                      {rule.kind === "income" ? "+" : "−"}
+                      {money(rule.amount)}
+                    </span>
+                  </div>
+                  <p className="hint">
+                    {rule.category} ·{" "}
+                    {wallet.accounts.find((a) => a.id === rule.accountId)?.name}{" "}
+                    · {rule.frequency === "week" ? "Mingguan" : "Bulanan"} ·{" "}
+                    {rule.active ? dateLabel(rule.nextDate, true) : "Dijeda"} ·{" "}
+                    {rule.mode === "auto"
+                      ? "Otomatis saat dibuka"
+                      : "Konfirmasi dulu"}
+                  </p>
+                  <div className="feature-actions">
+                    {rule.active && rule.nextDate <= today() && (
+                      <>
+                        <button
+                          disabled={busy}
+                          onClick={() =>
+                            void perform(async () => {
+                              await save(
+                                settleRecurring(wallet, rule.id),
+                                "Transaksi rutin dicatat.",
+                              );
+                            })
+                          }
+                        >
+                          Catat {dateLabel(rule.nextDate, true)}
+                        </button>
+                        <button
+                          className="text-button"
+                          disabled={busy}
+                          onClick={() =>
+                            void perform(async () => {
+                              await save(
+                                settleRecurring(wallet, rule.id, true),
+                                "Kejadian ini dilewati.",
+                              );
+                            })
+                          }
+                        >
+                          Lewati kali ini
+                        </button>
+                      </>
+                    )}
+                    <button
+                      className="text-button"
+                      disabled={busy}
+                      onClick={() => {
+                        setEditing(rule);
+                        setKind(rule.kind);
+                        setError("");
+                      }}
+                    >
+                      Ubah jadwal
+                    </button>
+                  </div>
+                </li>
+              ))}
+          </ul>
+          {!wallet.recurring.length && (
+            <p className="feature-empty">
+              Belum ada jadwal. Tambahkan satu kebutuhan rutin untuk mulai.
+            </p>
+          )}
+          {wallet.recurring.length > Math.max(5, due.length) && (
+            <button
+              className="text-button"
+              onClick={() => setShowAll(!showAll)}
+            >
+              {showAll
+                ? "Tampilkan lebih sedikit"
+                : `Lihat semua ${wallet.recurring.length} jadwal`}
+            </button>
+          )}
+        </>
+      )}
+
       {editing && (
         <form
-          className="recurring-form"
+          className="recurring-form feature-editor"
           key={current?.id ?? "new"}
           onSubmit={(e) => {
             e.preventDefault();
@@ -182,7 +212,6 @@ export function RecurringPanel({
             });
           }}
         >
-          <h3>{current ? "Edit jadwal" : "Jadwal baru"}</h3>
           <AccountSelect wallet={wallet} value={current?.accountId} />
           <label>
             Jenis
@@ -203,6 +232,7 @@ export function RecurringPanel({
                 pattern="[0-9]+"
                 maxLength={13}
                 defaultValue={current?.amount}
+                autoFocus
                 required
               />
             </label>
@@ -224,7 +254,7 @@ export function RecurringPanel({
             </label>
           </div>
           <label>
-            Nama atau catatan
+            Nama jadwal (opsional)
             <input
               name="note"
               maxLength={120}
@@ -254,14 +284,10 @@ export function RecurringPanel({
               />
             </label>
           </div>
-          <p className="hint">
-            Jika tanggal tidak ada pada suatu bulan, jadwal jatuh pada hari
-            terakhir bulan itu, lalu kembali ke tanggal asal.
-          </p>
           <label>
             Cara mencatat
             <select name="mode" defaultValue={current?.mode ?? "confirm"}>
-              <option value="confirm">Minta konfirmasi dahulu</option>
+              <option value="confirm">Konfirmasi sebelum dicatat</option>
               <option value="auto">Otomatis saat Saku dibuka</option>
             </select>
           </label>
@@ -277,7 +303,14 @@ export function RecurringPanel({
             <button className="primary" disabled={busy}>
               Simpan jadwal
             </button>
-            <button type="button" onClick={() => setEditing(null)}>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                setEditing(null);
+                setError("");
+              }}
+            >
               Batal
             </button>
             {current && (
@@ -308,7 +341,7 @@ export function RecurringPanel({
           </div>
         </form>
       )}
-      {Capacitor.isNativePlatform() && (
+      {!editing && Capacitor.isNativePlatform() && (
         <div className="reminder-setting">
           <button
             disabled={busy || requesting}
@@ -329,17 +362,32 @@ export function RecurringPanel({
               })
             }
           >
-            {wallet.reminders
-              ? "Matikan pengingat lokal"
-              : "Aktifkan pengingat lokal"}
+            {wallet.reminders ? "Matikan pengingat" : "Ingatkan saya"}
           </button>
           <p className="hint">
-            Pengingat berikutnya dijadwalkan pukul 09.00 waktu perangkat tanpa
-            menampilkan nominal. Waktu kirim mengikuti pengaturan baterai/fokus
-            sistem. Buka Saku untuk memperbarui pengingat berikutnya.
+            Pengingat {wallet.reminders ? "aktif" : "nonaktif"}. Notifikasi
+            hanya berisi pengingat umum, tanpa nominal.
           </p>
         </div>
       )}
-    </details>
+      <details className="feature-help">
+        <summary>Cara kerja jadwal</summary>
+        <p className="hint">
+          Pilih Konfirmasi untuk mengecek setiap kejadian sebelum dicatat. Mode
+          Otomatis mencatat jadwal jatuh tempo ketika Saku dibuka atau aktif,
+          bukan saat ditutup.
+        </p>
+        <p className="hint">
+          Tanggal bulanan yang tidak tersedia mengikuti hari terakhir bulan,
+          lalu kembali ke tanggal asal. Jadwal yang lewat tetap menunggu;
+          menghapus jadwal tidak menghapus transaksi sebelumnya.
+        </p>
+        <p className="hint">
+          Jika pengingat diaktifkan, kejadian berikutnya dijadwalkan pukul 09.00
+          waktu perangkat. Buka Saku untuk memperbaruinya. Pengaturan baterai
+          atau fokus bisa menunda notifikasi.
+        </p>
+      </details>
+    </section>
   );
 }

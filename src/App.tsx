@@ -81,7 +81,11 @@ import {
   type ProtectedBackup,
 } from "./backup";
 
-type Page = "home" | "transactions" | "reports" | "goals" | "settings";
+type Page =
+  "home" | "transactions" | "reports" | "goals" | "settings" | "wallets";
+type PlanTab = "goals" | "budget" | "recurring";
+type SettingView =
+  "profile" | "privacy" | "categories" | "backup" | "about" | null;
 type Modal =
   | { kind: "backup-export" }
   | { kind: "backup-import"; backup: ProtectedBackup }
@@ -96,14 +100,16 @@ type Modal =
       label?: string;
     };
 const pages = [
-  { id: "home", label: "Ringkasan", Icon: LayoutDashboard },
-  { id: "transactions", label: "Transaksi", Icon: ArrowLeftRight },
+  { id: "home", label: "Beranda", Icon: LayoutDashboard },
+  { id: "transactions", label: "Catatan", Icon: ArrowLeftRight },
+  { id: "goals", label: "Rencana", Icon: Target },
   { id: "reports", label: "Laporan", Icon: ChartNoAxesCombined },
-  { id: "goals", label: "Tujuan", Icon: Target },
-  { id: "settings", label: "Pengaturan", Icon: SlidersHorizontal },
+  { id: "settings", label: "Lainnya", Icon: SlidersHorizontal },
 ] as const;
 const readPage = (): Page =>
-  pages.find((p) => p.id === location.hash.slice(1))?.id ?? "home";
+  location.hash === "#wallets"
+    ? "wallets"
+    : (pages.find((p) => p.id === location.hash.slice(1))?.id ?? "home");
 let launchUrlConsumed = false;
 const formText = (form: HTMLFormElement, key: string) =>
   String(new FormData(form).get(key) ?? "").trim();
@@ -192,16 +198,20 @@ function Dialog({
   title,
   close,
   children,
+  focusAmount = false,
 }: {
   title: string;
   close: () => void;
   children: ReactNode;
+  focusAmount?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const before = document.activeElement as HTMLElement;
     const el = ref.current!;
     el.showModal();
+    if (focusAmount)
+      el.querySelector<HTMLInputElement>('[name="amount"]')?.focus();
     return () => {
       el.close();
       before?.focus();
@@ -237,6 +247,8 @@ export function App() {
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [page, setPage] = useState<Page>(readPage);
+  const [planTab, setPlanTab] = useState<PlanTab>("goals");
+  const [settingView, setSettingView] = useState<SettingView>(null);
   const pageContent = useRef<HTMLDivElement>(null);
   const previousPage = useRef(page);
   const swipe = useRef<{
@@ -277,6 +289,11 @@ export function App() {
       document.removeEventListener("visibilitychange", refresh);
     };
   }, []);
+  useEffect(() => {
+    pageContent.current
+      ?.querySelector<HTMLHeadingElement>("h1")
+      ?.focus({ preventScroll: true });
+  }, [page, settingView, loaded]);
   async function load() {
     setLoadError(false);
     try {
@@ -301,13 +318,16 @@ export function App() {
     if (Capacitor.getPlatform() !== "android") return;
     const listener = NativeApp.addListener("backButton", () => {
       if (modal) setModal(null);
-      else if (page !== "home") location.hash = "home";
+      else if (page === "settings" && settingView) {
+        setSettingView(null);
+        window.scrollTo(0, 0);
+      } else if (page !== "home") location.hash = "home";
       else void NativeApp.minimizeApp();
     });
     return () => {
       void listener.then((l) => l.remove());
     };
-  }, [modal, page]);
+  }, [modal, page, settingView]);
   useEffect(() => {
     if (!notice) return;
     const id = setTimeout(() => {
@@ -376,7 +396,8 @@ export function App() {
     const listener = LocalNotifications.addListener(
       "localNotificationActionPerformed",
       () => {
-        location.hash = "transactions";
+        setPlanTab("recurring");
+        location.hash = "goals";
       },
     );
     return () => {
@@ -441,11 +462,26 @@ export function App() {
   function navigate(p: Page) {
     location.hash = p;
     setPage(p);
+    setError("");
+    window.scrollTo(0, 0);
+  }
+  function plan(tab: PlanTab) {
+    setPlanTab(tab);
+    navigate("goals");
+  }
+  function settings(view: SettingView) {
+    setSettingView(view);
+    navigate("settings");
+  }
+  function record(kind: Kind) {
+    open({ kind: "transaction" });
+    setTxKind(kind);
   }
   function startSwipe(e: TouchEvent<HTMLElement>) {
     swipe.current = null;
     if (
       modal ||
+      page === "wallets" ||
       busy ||
       e.touches.length !== 1 ||
       !matchMedia("(max-width: 800px)").matches ||
@@ -860,11 +896,6 @@ export function App() {
         .toLocaleLowerCase("id")
         .includes(query.toLocaleLowerCase("id")),
   );
-  const budgetLeft = Math.max(0, wallet.budget - month.expense);
-  const reserveShare =
-    balance.balance > 0
-      ? Math.min(100, (balance.reserved / balance.balance) * 100)
-      : 0;
   const rows = (ts: Transaction[]) => (
     <div className="transaction-list">
       {ts.map((t) => (
@@ -913,37 +944,10 @@ export function App() {
       <span>{savedPulse ? "Tersimpan" : "Catat transaksi"}</span>
     </button>
   );
-  const goalPreview = (g: Goal) => {
-    const p = goalPlan(g);
-    return (
-      <div className="goal-preview" key={g.id}>
-        <div>
-          <span>{g.name}</span>
-          <span className="num">{pct(p.progress)}</span>
-        </div>
-        <GoalProgress
-          value={g.saved}
-          max={g.target}
-          label={`Progres ${g.name}`}
-        />
-        <div>
-          <small>{money(g.saved)}</small>
-          <small>dari {money(g.target)}</small>
-        </div>
-        <p className="goal-preview-pace">
-          {p.remaining === 0
-            ? "Target tercapai"
-            : p.overdue
-              ? "Tanggal target sudah lewat"
-              : `${money(p.daily)} / hari menuju target`}
-        </p>
-      </div>
-    );
-  };
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <a className="brand" href="#home" aria-label="Saku, ringkasan">
+        <a className="brand" href="#home" aria-label="Saku, Beranda">
           <Mark />
           <span>
             saku<span className="brand-dot">.</span>
@@ -954,7 +958,10 @@ export function App() {
           aria-label="Navigasi utama"
           style={
             {
-              "--nav-index": pages.findIndex((p) => p.id === page),
+              "--nav-index": Math.max(
+                0,
+                pages.findIndex((p) => p.id === page),
+              ),
             } as CSSProperties
           }
           {...swipeHandlers}
@@ -964,7 +971,14 @@ export function App() {
             <a
               key={id}
               href={`#${id}`}
-              aria-current={page === id ? "page" : undefined}
+              onClick={() => {
+                if (id === "settings") setSettingView(null);
+              }}
+              aria-current={
+                page === id || (page === "wallets" && id === "home")
+                  ? "page"
+                  : undefined
+              }
             >
               <Icon size={19} />
               <span>{label}</span>
@@ -986,32 +1000,46 @@ export function App() {
           </a>
           <button
             className="profile"
-            onClick={() => navigate("settings")}
+            onClick={() => settings(null)}
             aria-label={`Pengaturan ${wallet.name}`}
           >
             {wallet.name.slice(0, 1).toLocaleUpperCase("id")}
           </button>
         </div>
         {status}
-        <div ref={pageContent}>
+        <div className="page-content" key={page} ref={pageContent}>
           <header className="page-header">
             <div>
-              <h1>{pages.find((p) => p.id === page)?.label}</h1>
+              <h1 tabIndex={-1}>
+                {page === "wallets"
+                  ? "Dompet"
+                  : page === "settings" && settingView
+                    ? {
+                        profile: "Profil",
+                        privacy: "Privasi & widget",
+                        categories: "Kategori",
+                        backup: "Cadangan & data",
+                        about: "Tentang Saku",
+                      }[settingView]
+                    : pages.find((p) => p.id === page)?.label}
+              </h1>
               <p>
                 {page === "home"
-                  ? dateLabel(today())
+                  ? `Halo, ${wallet.name}. ${dateLabel(today(), true)}`
                   : page === "transactions"
-                    ? "Setiap rupiah punya cerita."
+                    ? "Uang masuk dan keluar, di satu tempat."
                     : page === "reports"
-                      ? "Kenali ritme uangmu."
+                      ? "Lihat pola pemasukan dan pengeluaran."
                       : page === "goals"
-                        ? "Sedikit demi sedikit, sampai tujuan."
-                        : "Atur kebiasaan. Jaga catatan."}
+                        ? "Atur tabungan, batas belanja, dan jadwal."
+                        : page === "wallets"
+                          ? "Uangmu tersimpan di mana saja?"
+                          : "Keperluan lain, mudah ditemukan."}
               </p>
             </div>
-            {page === "home" || page === "transactions" ? (
+            {page === "transactions" ? (
               addTransaction
-            ) : page === "goals" ? (
+            ) : page === "goals" && planTab === "goals" ? (
               <button
                 className="primary"
                 onClick={() => open({ kind: "goal" })}
@@ -1035,9 +1063,12 @@ export function App() {
           )}
           {page === "home" && (
             <>
-              <section className="balance-panel panel">
-                <div className="balance-main">
-                  <p className="muted">Saldo tersedia</p>
+              <div className="home-overview">
+                <section
+                  className="panel home-hero"
+                  aria-label="Uang yang tersedia"
+                >
+                  <p className="muted">Uang yang bisa dipakai</p>
                   <div
                     className="balance-value num"
                     data-testid="available-balance"
@@ -1045,179 +1076,153 @@ export function App() {
                     <AnimatedMoney value={balance.available} />
                   </div>
                   <p className="balance-caption">
-                    Uang yang bisa dipakai, setelah alokasi tujuan.
+                    Sudah dikurangi uang yang disisihkan untuk tabungan.
                   </p>
-                  <div
-                    className="pocket-bar"
-                    role="img"
-                    aria-label={`Saldo ${money(balance.balance)}, untuk tujuan ${money(balance.reserved)}`}
-                  >
-                    <span style={{ width: `${100 - reserveShare}%` }} />
-                    <span style={{ width: `${reserveShare}%` }} />
-                  </div>
-                  <div className="balance-parts">
-                    <span>
-                      Saldo total
+                  <details className="balance-detail">
+                    <summary>Rincian saldo</summary>
+                    <div className="key-value">
+                      <span>Total semua dompet</span>
                       <strong className="num">{money(balance.balance)}</strong>
-                    </span>
-                    <span>
-                      Untuk tujuan
+                    </div>
+                    <div className="key-value">
+                      <span>Disisihkan untuk tabungan</span>
                       <strong className="num">{money(balance.reserved)}</strong>
-                    </span>
+                    </div>
+                  </details>
+                  <div className="home-actions">
+                    <button
+                      className="primary"
+                      aria-label="Catat pengeluaran"
+                      onClick={() => record("expense")}
+                    >
+                      {savedPulse && txKind === "expense" ? (
+                        <Check className="success-check" size={20} />
+                      ) : (
+                        <ArrowUpRight size={20} />
+                      )}
+                      Pengeluaran
+                    </button>
+                    <button
+                      aria-label="Catat pemasukan"
+                      onClick={() => record("income")}
+                    >
+                      {savedPulse && txKind === "income" ? (
+                        <Check className="success-check" size={20} />
+                      ) : (
+                        <ArrowDownLeft size={20} />
+                      )}
+                      Pemasukan
+                    </button>
                   </div>
-                </div>
+                  <div className="home-shortcuts">
+                    <button onClick={() => navigate("wallets")}>
+                      <WalletIcon size={18} /> {wallet.accounts.length} dompet{" "}
+                      <ChevronRight size={16} />
+                    </button>
+                    <button onClick={() => plan("goals")}>
+                      <Target size={18} /> Tabungan <ChevronRight size={16} />
+                    </button>
+                  </div>
+                  <button
+                    className="home-budget"
+                    onClick={() => plan("budget")}
+                  >
+                    <span>
+                      {wallet.budget
+                        ? "Sisa anggaran bulan ini"
+                        : "Buat batas belanja bulanan"}
+                      <strong
+                        className={
+                          wallet.budget > 0 && month.expense > wallet.budget
+                            ? "num negative"
+                            : "num"
+                        }
+                      >
+                        {wallet.budget
+                          ? money(wallet.budget - month.expense)
+                          : "Atur anggaran"}
+                      </strong>
+                    </span>
+                    {wallet.budget > 0 && (
+                      <progress
+                        className={month.expense > wallet.budget ? "over" : ""}
+                        max={wallet.budget}
+                        value={Math.min(month.expense, wallet.budget)}
+                        aria-label="Anggaran terpakai"
+                      />
+                    )}
+                    <small>
+                      {wallet.budget
+                        ? `${money(month.expense)} terpakai dari ${money(wallet.budget)}`
+                        : "Tentukan batas agar pengeluaran lebih terarah."}
+                    </small>
+                  </button>
+                </section>
                 <SpendingGuide wallet={wallet} />
-              </section>
+              </div>
               {wallet.recurring.some(
                 (r) => r.active && r.nextDate <= today(),
               ) && (
                 <button
                   className="due-banner"
-                  onClick={() => navigate("transactions")}
+                  onClick={() => plan("recurring")}
                 >
-                  Ada jadwal jatuh tempo <ArrowRight size={16} />
+                  Ada jadwal yang perlu dicatat <ArrowRight size={16} />
                 </button>
               )}
-              <div className="overview-grid home-overview">
-                <Section
-                  title="Bulan ini"
-                  action={
-                    <button
-                      className="text-button"
-                      onClick={() => {
-                        setPeriod("month");
-                        setOffset(0);
-                        navigate("reports");
-                      }}
-                    >
-                      Lihat detail <ArrowRight size={16} />
-                    </button>
-                  }
-                >
-                  <p className="muted">
-                    {wallet.budget ? "Sisa anggaran" : "Pengeluaran tercatat"}
-                  </p>
-                  <div className="compact-value num">
-                    {money(wallet.budget ? budgetLeft : month.expense)}
-                  </div>
-                  {wallet.budget > 0 ? (
-                    <>
-                      <progress
-                        max={wallet.budget}
-                        value={Math.min(month.expense, wallet.budget)}
-                        className={month.expense >= wallet.budget ? "over" : ""}
-                        aria-label="Anggaran terpakai"
-                      />
-                      <p
-                        className={
-                          month.expense >= wallet.budget ? "negative" : "hint"
-                        }
-                      >
-                        {month.expense > wallet.budget
-                          ? `Melewati batas ${money(month.expense - wallet.budget)}.`
-                          : month.expense === wallet.budget
-                            ? "Anggaran bulan ini sudah habis."
-                            : `${money(month.expense)} terpakai dari ${money(wallet.budget)}.`}
-                      </p>
-                    </>
-                  ) : (
-                    <button
-                      className="text-button"
-                      onClick={() => navigate("settings")}
-                    >
-                      Atur anggaran bulanan
-                    </button>
-                  )}
-                  <div className="key-value">
-                    <span>Arus kas bersih</span>
-                    <strong
-                      className={`num ${month.net < 0 ? "negative" : ""}`}
-                    >
-                      {money(month.net)}
-                    </strong>
-                  </div>
-                  <p className="hint">
-                    Pemasukan dikurangi pengeluaran bulan ini. Saldo awal bukan
-                    pemasukan bulan berjalan.
-                  </p>
-                </Section>
-                <Section
-                  title="Transaksi terbaru"
-                  action={
-                    <button
-                      className="text-button"
-                      onClick={() => navigate("transactions")}
-                    >
-                      Semua <ArrowRight size={16} />
-                    </button>
-                  }
-                >
-                  {ordered.length ? (
-                    rows(ordered.slice(0, 3))
-                  ) : (
-                    <Empty
-                      title="Catatan pertamamu dimulai di sini."
-                      action={
-                        <button
-                          className="text-button"
-                          onClick={() => open({ kind: "transaction" })}
-                        >
-                          Tambah transaksi <Plus size={16} />
-                        </button>
-                      }
-                    >
-                      Masukkan uang yang diterima atau pengeluaran hari ini.
-                    </Empty>
-                  )}
-                </Section>
-              </div>
-              <details className="panel insight-preview">
-                <summary>
-                  Saku Insight <span className="muted">Lihat saran</span>
-                </summary>
-                <SmartInsights wallet={wallet} />
-                <MoneyAdvice wallet={wallet} />
-              </details>
-              {wallet.goals.length > 0 && (
-                <Section
-                  title="Tujuan terdekat"
-                  action={
-                    <button
-                      className="text-button"
-                      onClick={() => navigate("goals")}
-                    >
-                      Semua tujuan <ArrowRight size={16} />
-                    </button>
-                  }
-                >
-                  {goalPreview(
-                    [...wallet.goals].sort((a, b) =>
-                      a.deadline.localeCompare(b.deadline),
-                    )[0],
-                  )}
-                </Section>
-              )}
+              <Section
+                title="Catatan terbaru"
+                action={
+                  <button
+                    className="text-button"
+                    onClick={() => navigate("transactions")}
+                  >
+                    Lihat semua <ArrowRight size={16} />
+                  </button>
+                }
+              >
+                {ordered.length ? (
+                  rows(ordered.slice(0, 3))
+                ) : (
+                  <Empty title="Mulai dengan satu catatan.">
+                    Gunakan tombol pengeluaran atau pemasukan di atas. Saldo
+                    akan diperbarui setelah disimpan.
+                  </Empty>
+                )}
+              </Section>
+              <button
+                className="report-link"
+                onClick={() => navigate("reports")}
+              >
+                <ChartNoAxesCombined size={20} />
+                <span>
+                  Lihat laporan & saran
+                  <small>Pahami pola belanja tanpa menghitung sendiri.</small>
+                </span>
+                <ChevronRight size={18} />
+              </button>
             </>
           )}
-          {page === "transactions" && (
+          {page === "wallets" && (
             <>
+              <button
+                className="back-link text-button"
+                onClick={() => navigate("home")}
+              >
+                <ChevronLeft size={18} />
+                Ke Beranda
+              </button>
               <AccountsPanel
                 wallet={wallet}
                 busy={busy}
                 save={(next, message) => run(() => commit(next, message, true))}
               />
-              <RecurringPanel
-                wallet={wallet}
-                busy={busy}
-                save={(next, message) => run(() => commit(next, message, true))}
-              />
-              {reminderError && (
-                <p className="notice" role="status">
-                  {reminderError}
-                </p>
-              )}
+            </>
+          )}
+          {page === "transactions" && (
+            <>
               <Section
-                title="Riwayat uangmu"
+                title="Riwayat transaksi"
                 action={
                   <span className="muted">{filtered.length} transaksi</span>
                 }
@@ -1235,6 +1240,14 @@ export function App() {
                       placeholder="Cari catatan atau kategori"
                     />
                   </label>
+                </div>
+                <details className="filter-disclosure">
+                  <summary>
+                    Filter catatan
+                    {txMonth || accountFilter || filter !== "all"
+                      ? " · aktif"
+                      : ""}
+                  </summary>
                   <label className="sr-only" htmlFor="tx-month">
                     Bulan transaksi
                   </label>
@@ -1260,60 +1273,65 @@ export function App() {
                         </option>
                       ))}
                   </select>
-                </div>
-                <label className="account-filter">
-                  Dompet
-                  <select
-                    value={accountFilter}
-                    onChange={(e) => {
-                      setAccountFilter(e.target.value);
-                      setLimit(40);
-                    }}
-                  >
-                    <option value="">Semua dompet</option>
-                    {wallet.accounts.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="filter-row">
-                  <div
-                    className="tabs"
-                    role="group"
-                    aria-label="Jenis transaksi"
-                  >
-                    {(["all", "expense", "income"] as const).map((f) => (
+                  <label className="account-filter">
+                    Dompet
+                    <select
+                      value={accountFilter}
+                      onChange={(e) => {
+                        setAccountFilter(e.target.value);
+                        setLimit(40);
+                      }}
+                    >
+                      <option value="">Semua dompet</option>
+                      {wallet.accounts.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="filter-row">
+                    <div
+                      className="tabs"
+                      role="group"
+                      aria-label="Jenis transaksi"
+                    >
+                      {(["all", "expense", "income"] as const).map((f) => (
+                        <button
+                          key={f}
+                          aria-pressed={filter === f}
+                          onClick={() => {
+                            setFilter(f);
+                            setLimit(40);
+                          }}
+                        >
+                          {f === "all"
+                            ? "Semua"
+                            : f === "expense"
+                              ? "Pengeluaran"
+                              : "Pemasukan"}
+                        </button>
+                      ))}
+                    </div>
+                    {(query ||
+                      txMonth ||
+                      accountFilter ||
+                      filter !== "all") && (
                       <button
-                        key={f}
-                        aria-pressed={filter === f}
+                        className="text-button"
                         onClick={() => {
-                          setFilter(f);
+                          setQuery("");
+                          setTxMonth("");
+                          setAccountFilter("");
+                          setFilter("all");
                           setLimit(40);
                         }}
                       >
-                        {f === "all"
-                          ? "Semua"
-                          : f === "expense"
-                            ? "Pengeluaran"
-                            : "Pemasukan"}
+                        Reset
                       </button>
-                    ))}
+                    )}
                   </div>
-                  {(query || txMonth || accountFilter) && (
-                    <button
-                      className="text-button"
-                      onClick={() => {
-                        setQuery("");
-                        setTxMonth("");
-                        setAccountFilter("");
-                      }}
-                    >
-                      Reset
-                    </button>
-                  )}
-                </div>
+                </details>
                 <div className="transaction-summary">
                   <span>
                     Masuk{" "}
@@ -1357,7 +1375,7 @@ export function App() {
                       void run(() =>
                         exportFile(
                           `saku-transaksi-${today()}.csv`,
-                          csv(filtered),
+                          csv(filtered, wallet.accounts),
                           "text/csv",
                         ),
                       )
@@ -1558,7 +1576,8 @@ export function App() {
                     </Empty>
                   )}
                 </Section>
-                <Section title="Cara membaca laporan">
+                <details className="panel report-help">
+                  <summary>Cara membaca laporan</summary>
                   <div className="explanation">
                     <p>
                       <strong>Surplus = pemasukan − pengeluaran.</strong> Nilai
@@ -1579,242 +1598,402 @@ export function App() {
                       pemasukan atau pengeluaran.
                     </p>
                   </div>
-                </Section>
+                </details>
               </div>
+              <Section title="Saran untukmu">
+                <SmartInsights wallet={wallet} />
+                <details className="advice-more">
+                  <summary>Catatan keuangan lainnya</summary>
+                  <MoneyAdvice wallet={wallet} />
+                </details>
+              </Section>
             </>
           )}
           {page === "goals" && (
             <>
-              <div className="goals-summary panel">
-                <span>
-                  Sudah disisihkan
-                  <strong className="num">{money(balance.reserved)}</strong>
-                </span>
-                <span>
-                  Masih tersedia
-                  <strong className="num">{money(balance.available)}</strong>
-                </span>
-              </div>
-              {wallet.goals.length ? (
-                <div className="goals-grid">
-                  {wallet.goals.map((g) => {
-                    const p = goalPlan(g);
-                    return (
-                      <Section
-                        title={g.name}
-                        key={g.id}
-                        action={
-                          <button
-                            className="icon-button"
-                            aria-label={`Edit tujuan ${g.name}`}
-                            onClick={() => open({ kind: "goal", goal: g })}
-                          >
-                            <Pencil size={17} />
-                          </button>
-                        }
-                      >
-                        <div className="goal-amount num">
-                          <AnimatedMoney value={g.saved} />
-                          <span>dari {money(g.target)}</span>
-                        </div>
-                        <GoalProgress
-                          value={g.saved}
-                          max={g.target}
-                          label={`Progres ${g.name}`}
-                        />
-                        <div className="key-value">
-                          <span>{pct(p.progress)} terkumpul</span>
-                          <span>{dateLabel(g.deadline, true)}</span>
-                        </div>
-                        <div className="goal-pace">
-                          {p.remaining === 0 ? (
-                            <>
-                              <Check size={19} />
-                              <p>Target tercapai. Kamu berhasil!</p>
-                            </>
-                          ) : (
-                            <>
-                              <Target size={19} />
-                              <p>
-                                {p.overdue
-                                  ? "Target waktumu sudah lewat."
-                                  : `Sisihkan ${money(p.daily)} per hari.`}
-                                <small>
-                                  {p.overdue
-                                    ? `Masih kurang ${money(p.remaining)}. Atur ulang tanggal target.`
-                                    : `${p.days} hari termasuk hari ini · sisa ${money(p.remaining)}`}
-                                </small>
-                              </p>
-                            </>
-                          )}
-                        </div>
-                        <button
-                          className="wide"
-                          onClick={() => open({ kind: "allocate", goal: g })}
-                        >
-                          {p.remaining === 0
-                            ? "Kelola tabungan"
-                            : "Sisihkan uang"}
-                          <ArrowRight size={17} />
-                        </button>
-                      </Section>
-                    );
-                  })}
-                </div>
-              ) : (
-                <Section title="Yang ingin kamu wujudkan">
-                  <Empty
-                    title="Keinginan kecil, rencana yang nyata."
-                    action={
-                      <button
-                        className="primary"
-                        onClick={() => open({ kind: "goal" })}
-                      >
-                        <Plus size={18} />
-                        Buat tujuan pertama
-                      </button>
-                    }
+              <div
+                className="tabs plan-tabs"
+                role="group"
+                aria-label="Jenis rencana"
+              >
+                {(
+                  [
+                    { id: "goals", label: "Tabungan" },
+                    { id: "budget", label: "Anggaran" },
+                    { id: "recurring", label: "Jadwal" },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.id}
+                    aria-pressed={planTab === tab.id}
+                    onClick={() => setPlanTab(tab.id)}
                   >
-                    Tentukan nominal dan tanggal. Saku menghitung berapa yang
-                    perlu kamu sisihkan setiap hari.
-                  </Empty>
-                </Section>
-              )}
-              <p className="privacy-line">
-                <WalletIcon size={16} />
-                Alokasi tujuan tidak memindahkan uang ke rekening lain. Catat
-                pengeluaran saat uang benar-benar dipakai.
-              </p>
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              <div className="plan-content" key={planTab}>
+                {planTab === "goals" && (
+                  <>
+                    <div className="goals-summary panel">
+                      <span>
+                        Sudah disisihkan
+                        <strong className="num">
+                          {money(balance.reserved)}
+                        </strong>
+                      </span>
+                      <span>
+                        Masih tersedia
+                        <strong className="num">
+                          {money(balance.available)}
+                        </strong>
+                      </span>
+                    </div>
+                    {wallet.goals.length ? (
+                      <div className="goals-grid">
+                        {wallet.goals.map((g) => {
+                          const p = goalPlan(g);
+                          return (
+                            <Section
+                              title={g.name}
+                              key={g.id}
+                              action={
+                                <button
+                                  className="icon-button"
+                                  aria-label={`Edit tujuan ${g.name}`}
+                                  onClick={() =>
+                                    open({ kind: "goal", goal: g })
+                                  }
+                                >
+                                  <Pencil size={17} />
+                                </button>
+                              }
+                            >
+                              <div className="goal-amount num">
+                                <AnimatedMoney value={g.saved} />
+                                <span>dari {money(g.target)}</span>
+                              </div>
+                              <GoalProgress
+                                value={g.saved}
+                                max={g.target}
+                                label={`Progres ${g.name}`}
+                              />
+                              <div className="key-value">
+                                <span>{pct(p.progress)} terkumpul</span>
+                                <span>{dateLabel(g.deadline, true)}</span>
+                              </div>
+                              <div className="goal-pace">
+                                {p.remaining === 0 ? (
+                                  <>
+                                    <Check size={19} />
+                                    <p>Target tercapai. Kamu berhasil!</p>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Target size={19} />
+                                    <p>
+                                      {p.overdue
+                                        ? "Target waktumu sudah lewat."
+                                        : `Sisihkan ${money(p.daily)} per hari.`}
+                                      <small>
+                                        {p.overdue
+                                          ? `Masih kurang ${money(p.remaining)}. Atur ulang tanggal target.`
+                                          : `${p.days} hari termasuk hari ini · sisa ${money(p.remaining)}`}
+                                      </small>
+                                    </p>
+                                  </>
+                                )}
+                              </div>
+                              <button
+                                className="wide"
+                                onClick={() =>
+                                  open({ kind: "allocate", goal: g })
+                                }
+                              >
+                                {p.remaining === 0
+                                  ? "Kelola tabungan"
+                                  : "Sisihkan uang"}
+                                <ArrowRight size={17} />
+                              </button>
+                            </Section>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <Section title="Yang ingin kamu wujudkan">
+                        <Empty
+                          title="Keinginan kecil, rencana yang nyata."
+                          action={
+                            <button
+                              className="primary"
+                              onClick={() => open({ kind: "goal" })}
+                            >
+                              <Plus size={18} />
+                              Buat tujuan pertama
+                            </button>
+                          }
+                        >
+                          Tentukan nominal dan tanggal. Saku menghitung berapa
+                          yang perlu kamu sisihkan setiap hari.
+                        </Empty>
+                      </Section>
+                    )}
+                    <p className="privacy-line">
+                      <WalletIcon size={16} />
+                      Alokasi tujuan tidak memindahkan uang ke rekening lain.
+                      Catat pengeluaran saat uang benar-benar dipakai.
+                    </p>
+                  </>
+                )}
+                {planTab === "budget" && (
+                  <>
+                    <Section title="Batas belanja bulanan">
+                      <p className="muted">
+                        Tentukan total uang yang ingin kamu pakai dalam satu
+                        bulan.
+                      </p>
+                      <form
+                        key={wallet.budget}
+                        onSubmit={onSubmit(async (f) =>
+                          commit(
+                            {
+                              ...wallet,
+                              budget: parseAmount(formText(f, "budget"), true),
+                            },
+                            "Anggaran tersimpan.",
+                            true,
+                          ),
+                        )}
+                      >
+                        <AmountField
+                          label="Anggaran per bulan"
+                          name="budget"
+                          value={wallet.budget}
+                          zero
+                        />
+                        <p className="hint">
+                          Berlaku setiap bulan. Isi 0 jika belum ingin membatasi
+                          belanja.
+                        </p>
+                        <button className="primary" disabled={busy}>
+                          Simpan anggaran
+                        </button>
+                      </form>
+                    </Section>
+                    <CategoryBudgets
+                      wallet={wallet}
+                      busy={busy}
+                      save={(next, message) =>
+                        run(() => commit(next, message, true))
+                      }
+                    />
+                  </>
+                )}
+                {planTab === "recurring" && (
+                  <>
+                    {reminderError && (
+                      <p className="notice" role="status">
+                        {reminderError}
+                      </p>
+                    )}
+                    <RecurringPanel
+                      wallet={wallet}
+                      busy={busy}
+                      save={(next, message) =>
+                        run(() => commit(next, message, true))
+                      }
+                    />
+                  </>
+                )}
+              </div>
             </>
           )}
           {page === "settings" && (
-            <div className="settings-layout">
-              <Section title="Profil & anggaran">
-                <form
-                  key={`${wallet.name}-${wallet.budget}`}
-                  onSubmit={onSubmit(async (f) =>
-                    commit(
-                      {
-                        ...wallet,
-                        name: formText(f, "name"),
-                        budget: parseAmount(formText(f, "budget"), true),
-                      },
-                      "Pengaturan tersimpan.",
-                    ),
-                  )}
+            <>
+              {!settingView ? (
+                <section
+                  className="panel settings-menu"
+                  aria-label="Keperluan lainnya"
                 >
-                  <label>
-                    Nama panggilan
-                    <input
-                      name="name"
-                      defaultValue={wallet.name}
-                      required
-                      maxLength={40}
+                  {(
+                    [
+                      {
+                        id: "profile",
+                        title: "Profil",
+                        description: "Ubah nama panggilanmu.",
+                        Icon: Pencil,
+                      },
+                      {
+                        id: "privacy",
+                        title: "Privasi & widget",
+                        description: "Kunci aplikasi dan atur layar utama.",
+                        Icon: ShieldCheck,
+                      },
+                      {
+                        id: "categories",
+                        title: "Kategori",
+                        description: "Sesuaikan pengelompokan catatan.",
+                        Icon: SlidersHorizontal,
+                      },
+                      {
+                        id: "backup",
+                        title: "Cadangan & data",
+                        description:
+                          "Simpan atau pulihkan catatan dengan aman.",
+                        Icon: Download,
+                      },
+                      {
+                        id: "about",
+                        title: "Tentang Saku",
+                        description: "Versi aplikasi dan cara menjaga data.",
+                        Icon: WalletIcon,
+                      },
+                    ] as const
+                  ).map((item) => (
+                    <button key={item.id} onClick={() => settings(item.id)}>
+                      <item.Icon size={20} />
+                      <span>
+                        {item.title}
+                        <small>{item.description}</small>
+                      </span>
+                      <ChevronRight size={18} />
+                    </button>
+                  ))}
+                </section>
+              ) : (
+                <div className="settings-detail" key={settingView}>
+                  <button
+                    className="back-link text-button"
+                    onClick={() => settings(null)}
+                  >
+                    <ChevronLeft size={18} />
+                    Semua pengaturan
+                  </button>
+                  {settingView === "profile" && (
+                    <>
+                      <Section title="Nama panggilan">
+                        <form
+                          key={wallet.name}
+                          onSubmit={onSubmit(async (f) =>
+                            commit(
+                              {
+                                ...wallet,
+                                name: formText(f, "name"),
+                              },
+                              "Pengaturan tersimpan.",
+                            ),
+                          )}
+                        >
+                          <label>
+                            Nama panggilan
+                            <input
+                              name="name"
+                              defaultValue={wallet.name}
+                              required
+                              maxLength={40}
+                            />
+                          </label>
+                          <button className="primary" disabled={busy}>
+                            Simpan pengaturan
+                          </button>
+                        </form>
+                      </Section>
+                    </>
+                  )}
+                  {settingView === "privacy" && (
+                    <PrivacySettings wallet={wallet} />
+                  )}
+                  {settingView === "categories" && (
+                    <ManageCategories
+                      wallet={wallet}
+                      busy={busy}
+                      save={(next, message) =>
+                        run(() => commit(next, message, true))
+                      }
                     />
-                  </label>
-                  <AmountField
-                    label="Anggaran pengeluaran bulanan"
-                    name="budget"
-                    value={wallet.budget}
-                    zero
-                  />
-                  <p className="hint">
-                    Batas yang sama dipakai setiap bulan. Isi 0 untuk
-                    menonaktifkan.
-                  </p>
-                  <button className="primary" disabled={busy}>
-                    Simpan pengaturan
-                  </button>
-                </form>
-              </Section>
-              <div className="settings-side">
-                <PrivacySettings wallet={wallet} />
-                <CategoryBudgets
-                  wallet={wallet}
-                  busy={busy}
-                  save={(next, message) =>
-                    run(() => commit(next, message, true))
-                  }
-                />
-                <ManageCategories
-                  wallet={wallet}
-                  busy={busy}
-                  save={(next, message) =>
-                    run(() => commit(next, message, true))
-                  }
-                />
-                <Section title="Cadangan & data">
-                  <p className="muted">
-                    Catatan tersimpan di perangkat ini. Simpan cadangan secara
-                    berkala, terutama sebelum mengganti HP atau menghapus
-                    aplikasi.
-                  </p>
-                  <button
-                    className="primary wide"
-                    disabled={busy}
-                    onClick={() => open({ kind: "backup-export" })}
-                  >
-                    <Download size={17} />
-                    Ekspor cadangan berpassword
-                  </button>
-                  <button
-                    className="wide"
-                    disabled={busy}
-                    onClick={() => importRef.current?.click()}
-                  >
-                    <Upload size={17} />
-                    Impor cadangan JSON
-                  </button>
-                  <button
-                    className="text-button"
-                    disabled={busy || !wallet.transactions.length}
-                    onClick={() =>
-                      void run(() =>
-                        exportFile(
-                          `saku-transaksi-${today()}.csv`,
-                          csv(ordered, wallet.accounts),
-                          "text/csv",
-                        ),
-                      )
-                    }
-                  >
-                    <Download size={16} />
-                    Ekspor semua transaksi CSV
-                  </button>
-                  <p className="hint">
-                    Cadangan JSON baru dilindungi kata sandi; cadangan lama
-                    tetap bisa diimpor. CSV tidak dienkripsi. Simpan kata sandi
-                    terpisah karena tidak ada pemulihan lewat server.
-                  </p>
-                </Section>
-                <Section title="Tentang Saku">
-                  <div className="about-brand">
-                    <Mark />
-                    <span>saku.</span>
-                    <small>v1.5.0</small>
-                  </div>
-                  <p className="muted">
-                    Catat pengeluaran, pahami kebiasaan, dan sisihkan uang untuk
-                    hal yang berarti. Oleh Velora Studio Dev, tanpa akun dan
-                    tanpa iklan.
-                  </p>
-                  <p className="hint">
-                    Di aplikasi Android/iOS, catatan dienkripsi di perangkat.
-                    Semua fitur inti berjalan offline. Gunakan kunci layar untuk
-                    membatasi akses. Data terhapus jika aplikasi di-uninstall;
-                    simpan cadangan secara berkala.
-                  </p>
-                  <div className="key-value">
-                    <span>Transaksi tersimpan</span>
-                    <span>{wallet.transactions.length}</span>
-                  </div>
-                  <div className="key-value">
-                    <span>Tujuan aktif</span>
-                    <span>{wallet.goals.length}</span>
-                  </div>
-                </Section>
-              </div>
-            </div>
+                  )}
+                  {settingView === "backup" && (
+                    <>
+                      <Section title="Cadangan & data">
+                        <p className="muted">
+                          Catatan tersimpan di perangkat ini. Simpan cadangan
+                          secara berkala, terutama sebelum mengganti HP atau
+                          menghapus aplikasi.
+                        </p>
+                        <button
+                          className="primary wide"
+                          disabled={busy}
+                          onClick={() => open({ kind: "backup-export" })}
+                        >
+                          <Download size={17} />
+                          Ekspor cadangan berpassword
+                        </button>
+                        <button
+                          className="wide"
+                          disabled={busy}
+                          onClick={() => importRef.current?.click()}
+                        >
+                          <Upload size={17} />
+                          Impor cadangan JSON
+                        </button>
+                        <button
+                          className="text-button"
+                          disabled={busy || !wallet.transactions.length}
+                          onClick={() =>
+                            void run(() =>
+                              exportFile(
+                                `saku-transaksi-${today()}.csv`,
+                                csv(ordered, wallet.accounts),
+                                "text/csv",
+                              ),
+                            )
+                          }
+                        >
+                          <Download size={16} />
+                          Ekspor semua transaksi CSV
+                        </button>
+                        <p className="hint">
+                          Cadangan JSON baru dilindungi kata sandi; cadangan
+                          lama tetap bisa diimpor. CSV tidak dienkripsi. Simpan
+                          kata sandi terpisah karena tidak ada pemulihan lewat
+                          server.
+                        </p>
+                      </Section>
+                    </>
+                  )}
+                  {settingView === "about" && (
+                    <>
+                      <Section title="Tentang Saku">
+                        <div className="about-brand">
+                          <Mark />
+                          <span>saku.</span>
+                          <small>v1.5.5</small>
+                        </div>
+                        <p className="muted">
+                          Catat pengeluaran, pahami kebiasaan, dan sisihkan uang
+                          untuk hal yang berarti. Oleh Velora Studio Dev, tanpa
+                          akun dan tanpa iklan.
+                        </p>
+                        <p className="hint">
+                          Di aplikasi Android/iOS, catatan dienkripsi di
+                          perangkat. Semua fitur inti berjalan offline. Gunakan
+                          kunci layar untuk membatasi akses. Data terhapus jika
+                          aplikasi di-uninstall; simpan cadangan secara berkala.
+                        </p>
+                        <div className="key-value">
+                          <span>Transaksi tersimpan</span>
+                          <span>{wallet.transactions.length}</span>
+                        </div>
+                        <div className="key-value">
+                          <span>Tujuan aktif</span>
+                          <span>{wallet.goals.length}</span>
+                        </div>
+                      </Section>
+                    </>
+                  )}
+                </div>
+              )}
+            </>
           )}
           <footer className="app-footer">
             <span>
@@ -1831,6 +2010,7 @@ export function App() {
         <Dialog
           title={modal.transaction ? "Edit transaksi" : "Catat transaksi"}
           close={close}
+          focusAmount
         >
           <form
             onSubmit={onSubmit(async (f) => {
@@ -1878,11 +2058,22 @@ export function App() {
                 </button>
               ))}
             </div>
-            <AccountSelect
-              wallet={wallet}
-              value={modal.transaction?.accountId}
+            <AmountField
+              label="Berapa nominalnya?"
+              value={modal.transaction?.amount}
             />
-            <AmountField value={modal.transaction?.amount} />
+            {wallet.accounts.length > 1 ? (
+              <AccountSelect
+                wallet={wallet}
+                value={modal.transaction?.accountId}
+              />
+            ) : (
+              <input
+                type="hidden"
+                name="accountId"
+                value={wallet.accounts[0].id}
+              />
+            )}
             <div className="form-two">
               <label>
                 Kategori
