@@ -31,6 +31,7 @@ import {
   Check,
   ArrowRight,
   ShieldCheck,
+  Bell,
   Wallet as WalletIcon,
 } from "lucide-react";
 import {
@@ -74,6 +75,8 @@ import {
 } from "./MoneyManagement";
 import { PrivacySettings, publishWidget } from "./Privacy";
 import { syncReminders } from "./reminders";
+import { DAILY_REMINDER_ID, syncDailyReminder } from "./dailyReminder";
+import { DailyReminderSettings } from "./DailyReminderSettings";
 import {
   protectBackup,
   unlockBackup,
@@ -85,7 +88,13 @@ type Page =
   "home" | "transactions" | "reports" | "goals" | "settings" | "wallets";
 type PlanTab = "goals" | "budget" | "recurring";
 type SettingView =
-  "profile" | "privacy" | "categories" | "backup" | "about" | null;
+  | "profile"
+  | "privacy"
+  | "reminders"
+  | "categories"
+  | "backup"
+  | "about"
+  | null;
 type Modal =
   | { kind: "backup-export" }
   | { kind: "backup-import"; backup: ProtectedBackup }
@@ -242,7 +251,13 @@ function Dialog({
   );
 }
 
-export function App() {
+export function App({
+  initialNotice = "",
+  onShowWelcome,
+}: {
+  initialNotice?: string;
+  onShowWelcome: () => void;
+}) {
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
@@ -260,7 +275,7 @@ export function App() {
   const suppressClickUntil = useRef(0);
   const [modal, setModal] = useState<Modal | null>(null);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState(initialNotice);
   const [busy, setBusy] = useState(false);
   const [undo, setUndo] = useState<Wallet | null>(null);
   const [savedPulse, setSavedPulse] = useState(false);
@@ -280,6 +295,31 @@ export function App() {
   const [categoryKind, setCategoryKind] = useState<Kind>("expense");
   const importRef = useRef<HTMLInputElement>(null);
   const [currentDate, setCurrentDate] = useState(today);
+  const hasWallet = wallet !== null;
+  useEffect(() => {
+    if (!hasWallet || !Capacitor.isNativePlatform()) return;
+    let active = true;
+    let reported = false;
+    const refresh = () =>
+      void syncDailyReminder().catch((error) => {
+        if (active && !reported) {
+          reported = true;
+          setNotice(
+            error instanceof Error
+              ? error.message
+              : "Periksa pengingat harian di Lainnya → Pengingat.",
+          );
+        }
+      });
+    refresh();
+    const listener = NativeApp.addListener("appStateChange", ({ isActive }) => {
+      if (isActive) refresh();
+    });
+    return () => {
+      active = false;
+      void listener.then((l) => l.remove());
+    };
+  }, [hasWallet]);
   useEffect(() => {
     const refresh = () => setCurrentDate(today());
     const timer = setInterval(refresh, 60000);
@@ -395,9 +435,14 @@ export function App() {
     if (!Capacitor.isNativePlatform()) return;
     const listener = LocalNotifications.addListener(
       "localNotificationActionPerformed",
-      () => {
-        setPlanTab("recurring");
-        location.hash = "goals";
+      ({ notification }) => {
+        if (notification.id === DAILY_REMINDER_ID) {
+          location.hash = "transactions";
+          setQuickAdd(true);
+        } else {
+          setPlanTab("recurring");
+          location.hash = "goals";
+        }
       },
     );
     return () => {
@@ -1017,6 +1062,7 @@ export function App() {
                     ? {
                         profile: "Profil",
                         privacy: "Privasi & widget",
+                        reminders: "Pengingat",
                         categories: "Kategori",
                         backup: "Cadangan & data",
                         about: "Tentang Saku",
@@ -1843,6 +1889,12 @@ export function App() {
                         Icon: Download,
                       },
                       {
+                        id: "reminders",
+                        title: "Pengingat",
+                        description: "Pilih waktu untuk melengkapi catatan.",
+                        Icon: Bell,
+                      },
+                      {
                         id: "about",
                         title: "Tentang Saku",
                         description: "Versi aplikasi dan cara menjaga data.",
@@ -1903,6 +1955,7 @@ export function App() {
                   {settingView === "privacy" && (
                     <PrivacySettings wallet={wallet} />
                   )}
+                  {settingView === "reminders" && <DailyReminderSettings />}
                   {settingView === "categories" && (
                     <ManageCategories
                       wallet={wallet}
@@ -1967,13 +2020,16 @@ export function App() {
                         <div className="about-brand">
                           <Mark />
                           <span>saku.</span>
-                          <small>v1.5.5</small>
+                          <small>v1.5.7</small>
                         </div>
                         <p className="muted">
                           Catat pengeluaran, pahami kebiasaan, dan sisihkan uang
                           untuk hal yang berarti. Oleh Velora Studio Dev, tanpa
                           akun dan tanpa iklan.
                         </p>
+                        <button className="wide" onClick={onShowWelcome}>
+                          Lihat panduan Saku <ArrowRight size={17} />
+                        </button>
                         <p className="hint">
                           Di aplikasi Android/iOS, catatan dienkripsi di
                           perangkat. Semua fitur inti berjalan offline. Gunakan

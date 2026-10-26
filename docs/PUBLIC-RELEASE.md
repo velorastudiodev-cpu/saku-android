@@ -35,3 +35,7 @@ Repositori Saku publik atas permintaan pemilik. Tahap 1.3–1.5 digabung menjadi
 ## Status 1.5.5
 
 Pembaruan tampilan putih–hijau, lima menu yang lebih jelas, dan formulir bertahap. Paket dan penandatanganan tetap sama, versionCode 6. Tidak ada perubahan skema keuangan atau layanan online. Lihat [catatan 1.5.5](RELEASE-1.5.5.md) untuk rincian dan batas pemeriksaan.
+
+## Status 1.5.7
+
+Panduan awal tiga halaman dan pengingat harian opsional ditambahkan, versionCode 7. Paket dan kunci rilis tetap sama. Ilustrasi tersedia lokal; tidak ada server push. Lihat [catatan 1.5.7](RELEASE-1.5.7.md).

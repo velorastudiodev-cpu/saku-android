@@ -1,15 +1,16 @@
-# Saku untuk iOS — status 1.5.5
+# Saku untuk iOS — status 1.5.7
 
 **Proyek native tersedia; belum ada IPA yang ditandatangani, build Xcode, atau pengujian iPhone.** APK Android tidak bisa dipasang di iPhone. Pengerjaan dilakukan pada Linux, sehingga hasil kompilasi Swift/SDK Apple dan perilaku iOS belum dapat dikonfirmasi.
 
 ## Yang disiapkan
 
-- Proyek Xcode di `ios/App/App.xcodeproj`, scheme `App`, bundle ID `com.velorastudio.saku`, versi 1.5.5 build 6, target minimum iOS 15.4. Minimum ini juga mendukung dialog dan API browser yang dipakai aplikasi.
+- Proyek Xcode di `ios/App/App.xcodeproj`, scheme `App`, bundle ID `com.velorastudio.saku`, versi 1.5.7 build 7, target minimum iOS 15.4. Minimum ini juga mendukung dialog dan API browser yang dipakai aplikasi.
 - SakuViewController terdaftar pada SceneDelegate dan storyboard; plugin SecureWallet memakai CryptoKit AES-256-GCM serta kunci Keychain `WhenUnlockedThisDeviceOnly` tanpa sinkronisasi iCloud.
 - Berkas data menggunakan atomic write, complete file protection, dan pengecualian backup. Kata sandi cadangan portabel independen dari kunci perangkat.
 - Light theme/status bar gelap, pengingat lokal opsional, berbagi berkas native, dan manifest privasi untuk UserDefaults serta timestamp berkas aplikasi.
 - Ikon dan splash memakai logo hijau yang diberikan pemilik, dengan latar netral.
 - Kunci aplikasi opsional melalui LocalAuthentication (Face ID/Touch ID/passcode), teks izin Face ID, pemeriksaan sesi pada akses ledger, dan penutup layar ketika tidak aktif.
+- Panduan awal berilustrasi serta pengingat harian kalender lokal dengan interruption level passive disiapkan di UI bersama; perilaku iOS tetap belum dikonfirmasi.
 - Fitur lintas platform v1.5 tersedia dalam UI bersama: multi-dompet, transfer, anggaran kategori, Boleh Jajan, dan insight. Widget hanya untuk Android.
 
 ## Membuka di Mac

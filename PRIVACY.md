@@ -1,6 +1,6 @@
 # Kebijakan privasi Saku
 
-Versi 1.5.0 · Pengembang: **Velora Studio Dev**.
+Versi 1.5.7 · Pengembang: **Velora Studio Dev**.
 
 Saku membantu Anda mencatat pemasukan, pengeluaran, anggaran, kategori, jadwal berulang, dan tujuan tabungan tanpa akun. Semua catatan dimasukkan oleh Anda; Saku tidak membaca bank, SMS, kontak, lokasi, kamera, atau transaksi dari aplikasi lain. Proyek iOS sedang dipersiapkan dan belum diverifikasi melalui build/perangkat Apple.
 
@@ -25,6 +25,10 @@ Boleh Jajan dan Saku Insight memakai aturan/perhitungan lokal. Tidak ada data ya
 Mode konfirmasi menunggu persetujuan Anda untuk setiap tanggal. Mode otomatis mencatat kejadian yang jatuh tempo saat aplikasi dibuka atau aktif. Tidak ada penarikan rekening; ini hanya catatan keuangan lokal. Jadwal tetap menunggu jika aplikasi ditutup.
 
 Pengingat lokal bersifat opsional dan meminta izin notifikasi setelah Anda memilih mengaktifkannya. Notifikasi memakai teks umum tanpa nominal, nama kategori, atau catatan transaksi. Sistem perangkat menyimpan jadwal/tanggal pengingat. Saku tidak memakai push server. Sistem dapat menunda notifikasi karena pengaturan baterai atau fokus. Buka aplikasi untuk memperbarui pengingat berikutnya.
+
+Tanda panduan sudah dibaca serta pilihan aktif/jam pengingat harian disimpan dalam preferensi lokal perangkat, terpisah dari catatan keuangan terenkripsi. Nilai ini tidak memuat nominal atau transaksi dan tidak ikut cadangan JSON. Menghapus data aplikasi mengembalikan panduan awal dan pilihan pengingat. Pengingat harian memiliki satu jadwal berulang; pengingat transaksi rutin diatur secara terpisah.
+
+Ilustrasi panduan disertakan di dalam aplikasi. Pembuatannya menggunakan alat gambar saat pengembangan; aplikasi tidak mengirim data pengguna ke alat tersebut atau membutuhkan koneksi untuk menampilkan gambar.
 
 ## Cadangan dan berbagi
 

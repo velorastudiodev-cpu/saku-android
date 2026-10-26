@@ -2351,6 +2351,217 @@ details[open] > :not(summary) {
     font-size: 11px;
   }
 }
+/* A short illustrated welcome uses the same green, with a warm paper ground. */
+.welcome-guide {
+  --welcome-paper: #fff8ed;
+  min-height: 100svh;
+  background: var(--welcome-paper);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding: calc(20px + env(safe-area-inset-top)) 0 env(safe-area-inset-bottom);
+}
+.welcome-header {
+  width: min(100%, 980px);
+  margin: 0 auto;
+  padding: 0 28px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.welcome-header .text-button {
+  color: var(--muted);
+  font-size: 13px;
+}
+.welcome-rail {
+  display: flex;
+  width: min(100%, 980px);
+  min-width: 0;
+  margin: auto;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.welcome-rail::-webkit-scrollbar {
+  display: none;
+}
+.welcome-slide {
+  flex: 0 0 100%;
+  min-width: 0;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  padding: 24px 40px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px 36px;
+  align-content: center;
+  align-items: center;
+}
+.welcome-art {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  aspect-ratio: 1;
+  min-width: 0;
+}
+.welcome-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+}
+.welcome-copy {
+  grid-column: 2;
+}
+.welcome-copy h1 {
+  font-size: 34px;
+  font-weight: 500;
+  letter-spacing: -1px;
+  line-height: 1.2;
+}
+.welcome-copy > p {
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.65;
+}
+.welcome-copy > small {
+  display: block;
+  margin-top: 14px;
+  color: var(--accent-deep);
+  font-size: 13px;
+}
+.welcome-slide > .reminder-choice {
+  grid-column: 2;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid #e4dfd1;
+  border-radius: 16px;
+  background: #ffffff80;
+}
+.welcome-footer {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  width: min(100%, 460px);
+  margin: 0 auto;
+  padding: 12px 28px 24px;
+  gap: 8px 16px;
+}
+.welcome-dots {
+  display: flex;
+  margin-left: -8px;
+}
+.welcome-dots > button {
+  width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.welcome-dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 8px;
+  background: #b5c4b7;
+  transition:
+    width 200ms var(--ease),
+    background-color 200ms;
+}
+.welcome-dots [aria-current="step"] span {
+  width: 24px;
+  background: var(--accent);
+}
+.welcome-count {
+  color: var(--muted);
+  font-size: 13px;
+}
+.welcome-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 12px;
+}
+.welcome-actions > .primary {
+  flex: 1;
+  min-height: 52px;
+  justify-content: space-between;
+  padding: 14px 20px;
+}
+.welcome-back {
+  width: 52px;
+  padding: 0;
+}
+.reminder-choice {
+  margin: 20px 0;
+}
+.reminder-choice .check-label {
+  align-items: center;
+  margin: 0;
+  font-size: 14px;
+}
+.reminder-choice small {
+  display: block;
+  margin-top: 4px;
+  font-weight: 400;
+}
+.reminder-time {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 16px 0 0;
+  font-size: 14px;
+}
+.reminder-time input {
+  width: 128px;
+  margin: 0;
+}
+.daily-settings > p {
+  font-size: 14px;
+  line-height: 1.65;
+}
+.daily-settings form > .hint {
+  margin-top: 12px;
+}
+@media (max-width: 640px) {
+  .welcome-header {
+    padding: 0 24px 8px;
+  }
+  .welcome-slide {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 12px 28px;
+    gap: 20px;
+  }
+  .welcome-art {
+    width: min(68vw, 264px, 32svh);
+  }
+  .welcome-copy {
+    text-align: center;
+    max-width: 370px;
+  }
+  .welcome-copy h1 {
+    font-size: 28px;
+    letter-spacing: -0.7px;
+  }
+  .welcome-copy > p {
+    margin-top: 12px;
+    font-size: 15px;
+  }
+  .welcome-copy > small {
+    margin-top: 12px;
+  }
+  .welcome-slide > .reminder-choice {
+    width: 100%;
+    max-width: 370px;
+    text-align: left;
+    padding: 14px;
+  }
+  .welcome-footer {
+    padding-top: 8px;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

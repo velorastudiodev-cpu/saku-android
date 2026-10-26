@@ -1,12 +1,12 @@
 {
   "name": "saku-personal-finance",
-  "version": "1.5.5",
+  "version": "1.5.7",
   "description": "Saku oleh Velora Studio Dev: keuangan offline dengan multi-dompet, anggaran kategori, Boleh Jajan, insight, widget Android, dan cadangan berpassword.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "tsx --test tests/domain.test.ts tests/v13.test.ts tests/v15.test.ts",
+    "test": "tsx --test tests/domain.test.ts tests/v13.test.ts tests/v15.test.ts tests/v157.test.ts",
     "test:e2e": "playwright test",
     "android:sync": "npm run build && cap sync android",
     "ios:sync": "npm run build && cap sync ios"

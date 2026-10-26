@@ -6,11 +6,16 @@
 
 Saku membantu Anda mengetahui uang yang masih bisa dipakai, mengurangi pengeluaran, dan menabung untuk keinginan. Pisahkan tunai, rekening, serta e-wallet; catat uang masuk dan keluar; lalu lihat anggaran dan saran berdasarkan catatan Anda. Dibuat oleh **Velora Studio Dev**, tanpa login, iklan, backend, atau AI online.
 
-**[Unduh APK Saku 1.5.5](https://github.com/velorastudiodev-cpu/saku-android/releases/download/v1.5.5/Saku-1.5.5.apk)** · [Semua berkas rilis](https://github.com/velorastudiodev-cpu/saku-android/releases/tag/v1.5.5) · [Privasi](PRIVACY.md) · [Keamanan](SECURITY.md)
+**[Unduh APK Saku 1.5.7](https://github.com/velorastudiodev-cpu/saku-android/releases/download/v1.5.7/Saku-1.5.7.apk)** · [Semua berkas rilis](https://github.com/velorastudiodev-cpu/saku-android/releases/tag/v1.5.7) · [Privasi](PRIVACY.md) · [Keamanan](SECURITY.md)
 
 Android **7.0+** dengan Android System WebView yang diperbarui. Bahasa Indonesia, rupiah utuh. Repositori dan APK publik; belum diterbitkan di Google Play. **Proyek iOS 15.4+ tersedia, tetapi belum dikompilasi dengan Xcode atau dikonfirmasi di iPhone. Belum ada IPA/TestFlight.** [Status iOS](docs/IOS.md).
 
-## Yang baru di 1.5.5
+## Yang baru di 1.5.7
+
+- **Panduan awal tiga halaman**, bisa digeser atau memakai Lanjut/Kembali, dengan ilustrasi dompet, tabungan, dan catatan pribadi dalam hijau–cream. Tampil sekali pada perangkat, bisa dilewati, dan tersedia lagi di **Lainnya → Tentang Saku → Lihat panduan Saku**.
+- **Pengingat harian opsional**, default jam pilihan 20.00. Aktifkan di akhir panduan atau **Lainnya → Pengingat**; jam bisa diubah dan pengingat bisa dimatikan. Menolak izin tetap membolehkan memakai Saku.
+- Notifikasi singkat tanpa emoji, nominal, atau rincian transaksi. Ketuk untuk membuka form catatan. Pengingat dijadwalkan lokal, tanpa server atau internet.
+
 
 Tampilan putih–hijau dan alur yang lebih ringkas setelah masukan pengguna. Beranda mengutamakan uang tersedia, tombol Pengeluaran/Pemasukan, serta sisa anggaran. Rincian dan formulir lanjutan dibuka saat diperlukan.
 
@@ -36,7 +41,7 @@ Logo memakai gambar dari pemilik yang telah dipisahkan dari latar. Bidang putih 
 
 ## Memasang atau memperbarui
 
-1. Unduh `Saku-1.5.5.apk` dari tautan resmi di atas. AAB adalah berkas distribusi untuk Play Console, bukan berkas instalasi langsung.
+1. Unduh `Saku-1.5.7.apk` dari tautan resmi di atas. AAB adalah berkas distribusi untuk Play Console, bukan berkas instalasi langsung.
 2. **Jika sudah memakai Saku, ekspor cadangan terlebih dahulu.** Pasang pembaruan di atas aplikasi lama; jangan uninstall atau hapus data. ID paket dan sertifikat tetap sama.
 3. Android dapat meminta izin memasang aplikasi dari browser/pengelola file. Jika Play Protect meminta pemeriksaan, ikuti proses resmi Google.
 4. Dari versi 1.5, data dan skema tetap sama. Dari versi lebih lama, data masuk ke **Dompet utama** dengan saldo dan riwayat tetap. Tambahkan dompet lain dan gunakan transfer untuk membagi uang yang sudah tercatat.
@@ -49,7 +54,9 @@ Kode atau tanda tangan tidak menjamin peringatan Play Protect hilang. Verifikasi
 
 **Jadwal:** mode konfirmasi menunggu tombol Catat. Mode otomatis memproses kejadian saat aplikasi dibuka/aktif, bukan ketika aplikasi sudah ditutup. Maksimal 100 kejadian per batch; cursor dan transaksi disimpan bersama untuk mencegah duplikasi. Jadwal akhir bulan mempertahankan tanggal asal. Jadwal hanya mencatat uang, tidak memindahkan dana bank.
 
-**Pengingat:** setelah izin diberikan, kejadian berikutnya dijadwalkan pukul 09.00 waktu perangkat. Notifikasi tidak memuat nominal atau catatan. Buka Saku untuk memperbarui pengingat berikutnya; OS dapat menundanya karena baterai/fokus. Tidak meminta izin alarm presisi.
+**Pengingat harian:** satu jadwal lokal berulang pada jam pilihan, default 20.00. Pengingat ini mengajak mengecek kelengkapan catatan meskipun sudah ada transaksi hari itu. Android 8+ memakai saluran berprioritas rendah, tanpa suara/getaran bawaan; Android 7 memakai berkas suara senyap. Preferensi sistem tetap berlaku. Jam/status aktif disimpan per perangkat, tidak ikut cadangan JSON. Buka Saku setelah mengganti zona waktu atau izin notifikasi agar jadwal diselaraskan.
+
+**Pengingat jadwal rutin:** terpisah dari pengingat harian. Setelah izin diberikan, kejadian berikutnya dijadwalkan pukul 09.00 waktu perangkat. Notifikasi tidak memuat nominal atau catatan. Buka Saku untuk memperbarui pengingat berikutnya; OS dapat menundanya karena baterai/fokus. Tidak meminta izin alarm presisi.
 
 **Widget:** tekan lama layar utama Android → Widget → Saku. Saldo dan anggaran diperbarui ketika Saku dibuka atau data disimpan, dengan tanggal pembaruan terlihat. Widget tidak menjalankan transaksi berulang. Pada pergantian bulan, buka Saku untuk memperbarui anggaran. Jika kunci aplikasi aktif, angka widget disembunyikan dan izinnya direset. Widget tersedia untuk Android; tidak ada widget iOS pada versi ini.
 
@@ -100,11 +107,11 @@ export SAKU_STORE_PASSWORD_FILE=/lokasi/privat/release-password.txt
 bash scripts/build-android.sh
 ```
 
-ID paket `com.velorastudio.saku`, versionCode **6**, versionName **1.5.5**. APK/AAB bertanda tangan dan SHA-256 masuk `artifacts/`; kunci tidak masuk repo. [Panduan iOS](docs/IOS.md).
+ID paket `com.velorastudio.saku`, versionCode **7**, versionName **1.5.7**. APK/AAB bertanda tangan dan SHA-256 masuk `artifacts/`; kunci tidak masuk repo. [Panduan iOS](docs/IOS.md).
 
 Batas data: 30 dompet, 20.000 transaksi, 20.000 transfer, 100 tujuan, 50 jadwal, 50 kategori custom per jenis; nominal serta jumlah saldo awal maksimal Rp1 triliun. Impor plaintext maksimal 10 MB, berkas terenkripsi maksimal 16 MB; penyimpanan native membatasi plaintext 10 MB. Skema divalidasi sebelum penulisan.
 
-Ponytail dan Taste Skill digunakan; arah visual **Pastel consumer**, seed `1928218152`, dengan putih–hijau logo Saku dan Geist lokal. Rilis 1.5.5 berfokus pada presentasi dan navigasi; perhitungan serta penyimpanan tetap memakai implementasi 1.5. Build produksi dan Android diperiksa. Tidak ada screenshot atau pengujian UI/perangkat langsung; detail ada di [catatan rilis 1.5.5](docs/RELEASE-1.5.5.md). Fixture pengembangan bukan data bawaan pengguna.
+Ponytail dan Taste Skill digunakan; arah visual **Pastel consumer**, seed `1928218152`, dengan putih–hijau logo Saku dan Geist lokal. Rilis 1.5.7 menambahkan panduan berilustrasi dan pengingat harian di atas tampilan 1.5.5; perhitungan serta penyimpanan catatan tetap memakai implementasi 1.5. Build produksi dan Android diperiksa. Tidak ada screenshot atau pengujian UI/perangkat langsung; detail ada di [catatan rilis 1.5.7](docs/RELEASE-1.5.7.md). Fixture pengembangan bukan data bawaan pengguna.
 
 ## Bantuan
 

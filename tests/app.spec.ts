@@ -4,6 +4,7 @@ import { balances, money } from "../src/domain";
 import AxeBuilder from "@axe-core/playwright";
 async function seeded(page: Page) {
   await page.addInitScript((w) => {
+    localStorage.setItem("CapacitorStorage.saku.welcome.v1", "seen");
     if (!localStorage.getItem("CapacitorStorage.saku.wallet.v1"))
       localStorage.setItem(
         "CapacitorStorage.saku.wallet.v1",
@@ -16,6 +17,7 @@ test("first run, write transaction, reload, edit, delete and reconcile balance",
   page,
 }) => {
   await page.goto("/");
+  await page.getByRole("button", { name: "Lewati panduan" }).click();
   await page.getByLabel("Nama panggilan").fill("Nara");
   await page.locator("input[name=opening]").fill("500000");
   await page.getByRole("button", { name: "Mulai mencatat" }).click();
@@ -176,9 +178,10 @@ test("monthly budget persists from the plan screen", async ({ page }) => {
 test("corrupt local storage is not overwritten and can be recovered via import", async ({
   page,
 }) => {
-  await page.addInitScript(() =>
-    localStorage.setItem("CapacitorStorage.saku.wallet.v1", "{bad"),
-  );
+  await page.addInitScript(() => {
+    localStorage.setItem("CapacitorStorage.saku.wallet.v1", "{bad");
+    localStorage.setItem("CapacitorStorage.saku.welcome.v1", "seen");
+  });
   await page.goto("/");
   await expect(
     page.getByRole("heading", { name: "Catatan belum bisa dibuka" }),
